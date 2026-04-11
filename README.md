@@ -6,8 +6,8 @@ Monorepo del producto **Gatekeeper** (control de asistencia B2B, multi-organizac
 
 | Paquete | Descripción | Tecnologías |
 |---------|-------------|-------------|
-| [gatekeeper-backend](gatekeeper-backend/README.md) | API RESTful | NestJS + MySQL (Drizzle ORM) |
-| [gatekeeper-frontend](gatekeeper-frontend/README.md) | Aplicación Web | Next.js 15 + React 19 |
+| [backend](backend/README.md) | API RESTful | NestJS + MySQL (Drizzle ORM) |
+| [frontend](frontend/README.md) | Aplicación Web | Next.js 15 + React 19 |
 
 ## Desarrollo
 
@@ -15,12 +15,12 @@ Cada proyecto tiene sus propias dependencias y scripts. Trabaja en cada director
 
 ```bash
 # Backend
-cd gatekeeper-backend
+cd backend
 npm install
 npm run dev
 
 # Frontend
-cd gatekeeper-frontend
+cd frontend
 npm install
 npm run dev
 ```
@@ -36,5 +36,5 @@ npm run dev
 ## Historial
 
 Este repositorio fue migrado a monorepo preservando el historial completo de commits de los repositorios originales:
-- `gatekeeper-frontend` (antes: github.com/gustavorh/gatekeeper-frontend)
-- `gatekeeper-backend` (antes: github.com/gustavorh/gatekeeper-backend)
+- `frontend` (antes: github.com/gustavorh/gatekeeper-frontend)
+- `backend` (antes: github.com/gustavorh/gatekeeper-backend)
