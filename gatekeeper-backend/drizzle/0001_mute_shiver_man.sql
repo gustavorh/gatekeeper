@@ -1,0 +1,1 @@
+ALTER TABLE `users` MODIFY COLUMN `rut` varchar(9) NOT NULL;

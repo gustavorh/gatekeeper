@@ -1,0 +1,25 @@
+name: Deploy to Portainer (Git Webhook)
+
+on:
+  push:
+    branches: ['main'] # ajusta si usas otra rama
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      # (Opcional pero recomendado) asegúrate de que compila
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+      - run: npm ci
+      - run: npm run build
+
+      # Dispara el redeploy del stack en Portainer
+      - name: Trigger Portainer Git Webhook
+        env:
+          PORTAINER_WEBHOOK: ${{ secrets.PORTAINER_WEBHOOK }}
+        run: |
+          curl -fsS -X POST "$PORTAINER_WEBHOOK"
