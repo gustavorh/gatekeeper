@@ -4,6 +4,7 @@ import {
   BadRequestException,
   NotFoundException,
 } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { IShiftService } from '../../domain/services/shift.service.interface';
 import { IShiftRepository } from '../../domain/repositories/shift.repository.interface';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
@@ -13,6 +14,12 @@ import {
   ShiftStatus,
 } from '../../domain/entities/shift.entity';
 import { ShiftFilters } from '../../domain/repositories/shift.repository.interface';
+import {
+  SHIFT_EVENTS,
+  ShiftClockedInEvent,
+  ShiftClockedOutEvent,
+  ShiftCompletedEvent,
+} from '../../domain/events/shift.events';
 
 @Injectable()
 export class ShiftService implements IShiftService {
@@ -21,6 +28,7 @@ export class ShiftService implements IShiftService {
     private readonly shiftRepository: IShiftRepository,
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   async clockIn(userId: string): Promise<Shift> {
@@ -46,6 +54,11 @@ export class ShiftService implements IShiftService {
     const updatedShift = await this.shiftRepository.update(shift.id, {
       status: ShiftStatus.ACTIVE,
     });
+
+    this.eventEmitter.emit(
+      SHIFT_EVENTS.CLOCKED_IN,
+      new ShiftClockedInEvent(updatedShift),
+    );
 
     return updatedShift;
   }
@@ -74,6 +87,15 @@ export class ShiftService implements IShiftService {
       clockOutTime: new Date(),
       status: ShiftStatus.COMPLETED,
     });
+
+    this.eventEmitter.emit(
+      SHIFT_EVENTS.CLOCKED_OUT,
+      new ShiftClockedOutEvent(updatedShift),
+    );
+    this.eventEmitter.emit(
+      SHIFT_EVENTS.COMPLETED,
+      new ShiftCompletedEvent(updatedShift),
+    );
 
     return updatedShift;
   }

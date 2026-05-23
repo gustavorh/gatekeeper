@@ -8,6 +8,7 @@ import { UserRepository } from '../../infrastructure/repositories/user.repositor
 import { ShiftController } from '../../presentation/controllers/shift.controller';
 import { AnalyticsController } from '../../presentation/controllers/analytics.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
+import { ShiftAuditListener } from '../listeners/shift-audit.listener';
 
 @Module({
   imports: [
@@ -24,6 +25,7 @@ import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
     ShiftRepository,
     UserRepository,
     JwtAuthGuard,
+    ShiftAuditListener,
     {
       provide: 'IShiftRepository',
       useClass: ShiftRepository,
