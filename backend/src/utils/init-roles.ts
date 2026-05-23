@@ -1,11 +1,13 @@
 import { eq } from 'drizzle-orm';
+import { Logger } from '@nestjs/common';
 import { roles } from '../infrastructure/database/schema';
 import { v4 as uuidv4 } from 'uuid';
 
-export async function initializeRoles(db: any) {
-  console.log('Inicializando roles...');
+const logger = new Logger('InitRoles');
 
-  // Verificar si existe el rol "user"
+export async function initializeRoles(db: any) {
+  logger.log('Initializing roles…');
+
   const existingUserRole = await db
     .select()
     .from(roles)
@@ -19,12 +21,11 @@ export async function initializeRoles(db: any) {
       description: 'Usuario regular del sistema',
       isActive: true,
     });
-    console.log('✓ Rol "user" creado');
+    logger.log('Created role "user"');
   } else {
-    console.log('- Rol "user" ya existe');
+    logger.debug('Role "user" already exists');
   }
 
-  // Verificar si existe el rol "admin"
   const existingAdminRole = await db
     .select()
     .from(roles)
@@ -38,10 +39,10 @@ export async function initializeRoles(db: any) {
       description: 'Administrador del sistema',
       isActive: true,
     });
-    console.log('✓ Rol "admin" creado');
+    logger.log('Created role "admin"');
   } else {
-    console.log('- Rol "admin" ya existe');
+    logger.debug('Role "admin" already exists');
   }
 
-  console.log('Roles inicializados correctamente');
+  logger.log('Roles initialized');
 }

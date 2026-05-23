@@ -1,8 +1,10 @@
+import * as crypto from 'node:crypto';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { LoggerModule } from 'nestjs-pino';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './application/modules/auth.module';
@@ -30,6 +32,37 @@ import { HttpExceptionFilter } from './presentation/filters/http-exception.filte
       delimiter: '.',
       maxListeners: 20,
       verboseMemoryLeak: true,
+    }),
+    LoggerModule.forRoot({
+      pinoHttp: {
+        autoLogging: true,
+        level: process.env.LOG_LEVEL || 'info',
+        genReqId: (req, res) => {
+          const headerId = req.headers['x-request-id'];
+          const id =
+            (typeof headerId === 'string' ? headerId : undefined) ||
+            crypto.randomUUID();
+          res.setHeader('x-request-id', id);
+          return id;
+        },
+        redact: {
+          paths: [
+            'req.headers.authorization',
+            'req.headers.cookie',
+            'req.body.password',
+            'req.body.currentPassword',
+            'req.body.newPassword',
+          ],
+          censor: '[redacted]',
+        },
+        transport:
+          process.env.NODE_ENV !== 'production'
+            ? {
+                target: 'pino-pretty',
+                options: { singleLine: true, translateTime: 'SYS:HH:MM:ss.l' },
+              }
+            : undefined,
+      },
     }),
     ThrottlerModule.forRootAsync({
       inject: [ConfigService],

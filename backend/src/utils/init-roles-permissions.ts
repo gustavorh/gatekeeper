@@ -1,10 +1,11 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { IRoleRepository } from '../domain/repositories/role.repository.interface';
 import { IPermissionRepository } from '../domain/repositories/permission.repository.interface';
-import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class InitRolesPermissions {
+  private readonly logger = new Logger(InitRolesPermissions.name);
+
   constructor(
     @Inject('IRoleRepository')
     private readonly roleRepository: IRoleRepository,
@@ -13,7 +14,7 @@ export class InitRolesPermissions {
   ) {}
 
   async initialize() {
-    console.log('Initializing roles and permissions...');
+    this.logger.log('Initializing roles and permissions…');
 
     // Crear permisos básicos
     const permissions = [
@@ -69,10 +70,10 @@ export class InitRolesPermissions {
       if (!existing) {
         const created = await this.permissionRepository.create(permission);
         createdPermissions.push(created);
-        console.log(`Created permission: ${permission.name}`);
+        this.logger.log(`Created permission: ${permission.name}`);
       } else {
         createdPermissions.push(existing);
-        console.log(`Permission already exists: ${permission.name}`);
+        this.logger.debug(`Permission already exists: ${permission.name}`);
       }
     }
 
@@ -98,14 +99,14 @@ export class InitRolesPermissions {
       if (!existing) {
         const created = await this.roleRepository.create(role);
         createdRoles.push(created);
-        console.log(`Created role: ${role.name}`);
+        this.logger.log(`Created role: ${role.name}`);
       } else {
         createdRoles.push(existing);
-        console.log(`Role already exists: ${role.name}`);
+        this.logger.debug(`Role already exists: ${role.name}`);
       }
     }
 
-    console.log('Roles and permissions initialization completed!');
+    this.logger.log('Roles and permissions initialization completed');
     return { roles: createdRoles, permissions: createdPermissions };
   }
 }

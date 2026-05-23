@@ -41,13 +41,7 @@ export default function UserList({ onEditUser, onDeleteUser }: UserListProps) {
         itemsPerPage,
         searchTerm
       );
-      console.log("Full response:", response);
       if (response.success && response.data) {
-        console.log("Response.data:", response.data);
-        console.log("Response.data.data:", response.data.data);
-        console.log("Response.data.users:", (response.data as any).users);
-
-        // Try different possible structures
         const users =
           response.data.data?.users || (response.data as any).users || [];
         const total =

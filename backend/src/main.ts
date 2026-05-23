@@ -1,13 +1,14 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
-import { LoggingInterceptor } from './presentation/interceptors/logging.interceptor';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   app.enableShutdownHooks();
 
@@ -20,8 +21,6 @@ async function bootstrap() {
       disableErrorMessages: false,
     }),
   );
-
-  app.useGlobalInterceptors(new LoggingInterceptor());
 
   const configService = app.get(ConfigService);
 
@@ -75,10 +74,9 @@ async function bootstrap() {
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
-  console.log(`🚀 Application is running on: http://localhost:${port}`);
-  console.log(
-    `📝 API Documentation available at: http://localhost:${port}/api/docs`,
-  );
+  const logger = app.get(Logger);
+  logger.log({ port }, `Application listening on port ${port}`);
+  logger.log(`Swagger docs at /api/docs`);
 }
 
 bootstrap();

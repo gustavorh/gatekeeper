@@ -96,28 +96,17 @@ export default function DashboardPage() {
       try {
         setLoadingActivities(true);
         const response = await apiClient.get("/shifts/history");
-        console.log("Full API response:", response.data);
         const responseData = response.data as any;
         const shifts = responseData?.shifts || [];
-        console.log("Extracted shifts:", shifts);
-        console.log("Shifts array length:", shifts.length);
 
         if (Array.isArray(shifts) && shifts.length > 0) {
-          console.log("Fetched shifts:", shifts);
-          // Sort by createdAt in descending order (most recent first)
           const sortedShifts = shifts.sort(
             (a, b) =>
               new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
           );
-          // Get only the latest shift
           const latestShift = sortedShifts[0];
-          console.log("Latest shift to display:", latestShift);
           setRecentActivities([latestShift]);
         } else {
-          console.log(
-            "No shifts found or shifts is not an array:",
-            typeof shifts
-          );
           setRecentActivities([]);
         }
       } catch (error) {
@@ -614,13 +603,7 @@ export default function DashboardPage() {
                       ) : (
                         <div className="space-y-4">
                           {recentActivities.map((shift, shiftIndex) => {
-                            console.log(
-                              `Processing shift ${shiftIndex}:`,
-                              shift
-                            );
                             const shiftInfo = getShiftDisplayInfo(shift);
-                            console.log(`Shift ${shiftIndex} info:`, shiftInfo);
-
                             return (
                               <div
                                 key={`shift-${shiftIndex}`}

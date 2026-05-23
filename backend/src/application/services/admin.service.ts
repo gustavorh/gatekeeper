@@ -3,6 +3,7 @@ import {
   Inject,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
@@ -41,6 +42,8 @@ import { RegisterDto } from '../dto/auth.dto';
 
 @Injectable()
 export class AdminService {
+  private readonly logger = new Logger(AdminService.name);
+
   constructor(
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
@@ -254,7 +257,7 @@ export class AdminService {
     if (createRoleDto.permissionIds && createRoleDto.permissionIds.length > 0) {
       // Note: You might need to implement assignPermissionToRole in the repository
       // For now, we'll just create the role
-      console.log(
+      this.logger.log(
         `Creating role with ${createRoleDto.permissionIds.length} permissions`,
       );
     }
