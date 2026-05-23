@@ -19,6 +19,7 @@ export const envValidationSchema = Joi.object({
   JWT_EXPIRES_IN: Joi.string().default('1d'),
 
   FRONTEND_URL: Joi.string().uri().optional(),
+  CORS_ORIGINS: Joi.string().default('http://localhost:8000'),
 
   THROTTLE_TTL: Joi.number().default(60),
   THROTTLE_LIMIT: Joi.number().default(100),

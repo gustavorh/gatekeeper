@@ -1,5 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { LoggingInterceptor } from './presentation/interceptors/logging.interceptor';
@@ -21,15 +23,27 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new LoggingInterceptor());
 
+  const configService = app.get(ConfigService);
+
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
+
+  const corsOrigins = (configService.get<string>('CORS_ORIGINS') || '')
+    .split(',')
+    .map((o) => o.trim())
+    .filter(Boolean);
+
   app.enableCors({
-    origin: [process.env.FRONTEND_URL, 'http://localhost:8000'].filter(
-      (o): o is string => Boolean(o),
-    ),
+    origin: corsOrigins.length > 0 ? corsOrigins : false,
     credentials: true,
   });
 
   // Swagger configuration
-  const config = new DocumentBuilder()
+  const swaggerConfig = new DocumentBuilder()
     .setTitle('Gatekeeper API')
     .setDescription(
       'RESTful API for the Gatekeeper application. This API provides authentication, user management, and role-based access control functionality.',
@@ -50,7 +64,7 @@ async function bootstrap() {
     )
     .build();
 
-  const document = SwaggerModule.createDocument(app, config);
+  const document = SwaggerModule.createDocument(app, swaggerConfig);
   SwaggerModule.setup('api/docs', app, document, {
     swaggerOptions: {
       persistAuthorization: true,
