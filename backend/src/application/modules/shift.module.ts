@@ -9,6 +9,7 @@ import { ShiftController } from '../../presentation/controllers/shift.controller
 import { AnalyticsController } from '../../presentation/controllers/analytics.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
 import { ShiftAuditListener } from '../listeners/shift-audit.listener';
+import { ShiftScheduleService } from '../services/shift-schedule.service';
 
 @Module({
   imports: [
@@ -22,6 +23,7 @@ import { ShiftAuditListener } from '../listeners/shift-audit.listener';
   providers: [
     ShiftService,
     AnalyticsService,
+    ShiftScheduleService,
     ShiftRepository,
     UserRepository,
     JwtAuthGuard,

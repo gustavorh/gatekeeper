@@ -4,9 +4,6 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  BadRequestException,
-  ValidationPipe,
-  UsePipes,
   UseGuards,
   Res,
 } from '@nestjs/common';
@@ -42,14 +39,6 @@ import {
  */
 @ApiTags('auth')
 @Controller('auth')
-@UsePipes(
-  new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    errorHttpStatusCode: HttpStatus.BAD_REQUEST,
-  }),
-)
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
@@ -115,16 +104,9 @@ export class AuthController {
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponse> {
-    try {
-      const auth = await this.authService.login(loginDto);
-      this.setAuthCookies(res, auth.token);
-      return auth;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Login failed',
-        error: error.message,
-      });
-    }
+    const auth = await this.authService.login(loginDto);
+    this.setAuthCookies(res, auth.token);
+    return auth;
   }
 
   /**
@@ -163,16 +145,9 @@ export class AuthController {
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthResponse> {
-    try {
-      const auth = await this.authService.register(registerDto);
-      this.setAuthCookies(res, auth.token);
-      return auth;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Registration failed',
-        error: error.message,
-      });
-    }
+    const auth = await this.authService.register(registerDto);
+    this.setAuthCookies(res, auth.token);
+    return auth;
   }
 
   /**
@@ -218,14 +193,7 @@ export class AuthController {
     @CurrentUser() user: User,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<{ success: boolean; message: string }> {
-    try {
-      return await this.authService.changePassword(user.id, changePasswordDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Password change failed',
-        error: error.message,
-      });
-    }
+    return this.authService.changePassword(user.id, changePasswordDto);
   }
 
   @Post('logout')

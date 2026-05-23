@@ -25,6 +25,8 @@ export const envValidationSchema = Joi.object({
   THROTTLE_LIMIT: Joi.number().default(100),
   THROTTLE_AUTH_TTL: Joi.number().default(60),
   THROTTLE_AUTH_LIMIT: Joi.number().default(5),
+
+  BULL_REDIS_URL: Joi.string().uri({ scheme: ['redis', 'rediss'] }).optional(),
 }).custom((value: Record<string, string | undefined>, helpers) => {
   if (!value.DATABASE_URL && !value.DB_HOST) {
     return helpers.error('any.invalid', {

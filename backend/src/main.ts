@@ -27,9 +27,22 @@ async function bootstrap() {
 
   app.use(cookieParser());
 
+  const isProd = process.env.NODE_ENV === 'production';
   app.use(
     helmet({
-      contentSecurityPolicy: false,
+      contentSecurityPolicy: isProd
+        ? {
+            directives: {
+              defaultSrc: ["'self'"],
+              scriptSrc: ["'self'", 'cdn.jsdelivr.net', "'unsafe-inline'"],
+              styleSrc: ["'self'", 'cdn.jsdelivr.net', "'unsafe-inline'"],
+              imgSrc: ["'self'", 'data:', 'cdn.jsdelivr.net'],
+              connectSrc: ["'self'"],
+              fontSrc: ["'self'", 'data:'],
+              frameSrc: ["'none'"],
+            },
+          }
+        : false,
       crossOriginEmbedderPolicy: false,
     }),
   );

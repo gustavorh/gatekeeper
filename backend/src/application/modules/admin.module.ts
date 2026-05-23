@@ -24,8 +24,8 @@ import { ShiftModule } from './shift.module';
   controllers: [AdminController],
   providers: [
     AdminService,
-    AdminAuthGuard,
     JwtAuthGuard,
+    AdminAuthGuard,
     UserRepository,
     RoleRepository,
     PermissionRepository,
@@ -42,6 +42,6 @@ import { ShiftModule } from './shift.module';
       useClass: PermissionRepository,
     },
   ],
-  exports: [AdminService, AdminAuthGuard],
+  exports: [AdminService, JwtAuthGuard, AdminAuthGuard],
 })
 export class AdminModule {}

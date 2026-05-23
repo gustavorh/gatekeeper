@@ -5,9 +5,6 @@ import {
   Body,
   HttpCode,
   HttpStatus,
-  BadRequestException,
-  ValidationPipe,
-  UsePipes,
   UseGuards,
   Query,
   Param,
@@ -40,14 +37,6 @@ import { ShiftStatus } from '../../domain/entities/shift.entity';
 @ApiTags('shifts')
 @Controller('shifts')
 @UseGuards(JwtAuthGuard)
-@UsePipes(
-  new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    errorHttpStatusCode: HttpStatus.BAD_REQUEST,
-  }),
-)
 export class ShiftController {
   constructor(private readonly shiftService: ShiftService) {}
 
@@ -86,15 +75,7 @@ export class ShiftController {
     description: 'User not found or inactive',
   })
   async clockIn(@CurrentUser() user: any): Promise<ShiftResponseDto> {
-    try {
-      const shift = await this.shiftService.clockIn(user.id);
-      return shift as ShiftResponseDto;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Clock in failed',
-        error: error.message,
-      });
-    }
+    return this.shiftService.clockIn(user.id) as Promise<ShiftResponseDto>;
   }
 
   /**
@@ -132,15 +113,7 @@ export class ShiftController {
     description: 'User not found or inactive, or no active shift found',
   })
   async clockOut(@CurrentUser() user: any): Promise<ShiftResponseDto> {
-    try {
-      const shift = await this.shiftService.clockOut(user.id);
-      return shift as ShiftResponseDto;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Clock out failed',
-        error: error.message,
-      });
-    }
+    return this.shiftService.clockOut(user.id) as Promise<ShiftResponseDto>;
   }
 
   /**
@@ -171,15 +144,7 @@ export class ShiftController {
   async getCurrentShift(
     @CurrentUser() user: any,
   ): Promise<ShiftResponseDto | null> {
-    try {
-      const shift = await this.shiftService.getCurrentShift(user.id);
-      return shift as ShiftResponseDto;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to get current shift',
-        error: error.message,
-      });
-    }
+    return this.shiftService.getCurrentShift(user.id) as Promise<ShiftResponseDto | null>;
   }
 
   /**
@@ -250,40 +215,20 @@ export class ShiftController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: string,
   ): Promise<ShiftHistoryResponseDto> {
-    try {
-      // Check if any filters are provided
-      const hasFilters = startDate || endDate || status;
-
-      if (hasFilters) {
-        // Use filtered method
-        const filters = {
-          startDate,
-          endDate,
-          status: status as ShiftStatus | undefined,
-        };
-
-        const result = await this.shiftService.getShiftHistoryWithFilters(
-          user.id,
-          filters,
-          limit || 10,
-          offset || 0,
-        );
-        return result as ShiftHistoryResponseDto;
-      } else {
-        // Use original method for backward compatibility
-        const result = await this.shiftService.getShiftHistory(
-          user.id,
-          limit || 10,
-          offset || 0,
-        );
-        return result as ShiftHistoryResponseDto;
-      }
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to get shift history',
-        error: error.message,
-      });
+    const hasFilters = startDate || endDate || status;
+    if (hasFilters) {
+      return this.shiftService.getShiftHistoryWithFilters(
+        user.id,
+        { startDate, endDate, status: status as ShiftStatus | undefined },
+        limit || 10,
+        offset || 0,
+      ) as Promise<ShiftHistoryResponseDto>;
     }
+    return this.shiftService.getShiftHistory(
+      user.id,
+      limit || 10,
+      offset || 0,
+    ) as Promise<ShiftHistoryResponseDto>;
   }
 
   /**
@@ -359,39 +304,19 @@ export class ShiftController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: string,
   ): Promise<ShiftHistoryResponseDto> {
-    try {
-      // Check if any filters are provided
-      const hasFilters = startDate || endDate || status;
-
-      if (hasFilters) {
-        // Use filtered method
-        const filters = {
-          startDate,
-          endDate,
-          status: status as ShiftStatus | undefined,
-        };
-
-        const result = await this.shiftService.getShiftHistoryWithFilters(
-          userId,
-          filters,
-          limit || 10,
-          offset || 0,
-        );
-        return result as ShiftHistoryResponseDto;
-      } else {
-        // Use original method for backward compatibility
-        const result = await this.shiftService.getShiftHistory(
-          userId,
-          limit || 10,
-          offset || 0,
-        );
-        return result as ShiftHistoryResponseDto;
-      }
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to get shift history',
-        error: error.message,
-      });
+    const hasFilters = startDate || endDate || status;
+    if (hasFilters) {
+      return this.shiftService.getShiftHistoryWithFilters(
+        userId,
+        { startDate, endDate, status: status as ShiftStatus | undefined },
+        limit || 10,
+        offset || 0,
+      ) as Promise<ShiftHistoryResponseDto>;
     }
+    return this.shiftService.getShiftHistory(
+      userId,
+      limit || 10,
+      offset || 0,
+    ) as Promise<ShiftHistoryResponseDto>;
   }
 }

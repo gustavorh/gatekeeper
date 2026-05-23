@@ -4,11 +4,14 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR, APP_FILTER, APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { ScheduleModule } from '@nestjs/schedule';
+import { BullModule } from '@nestjs/bullmq';
 import { LoggerModule } from 'nestjs-pino';
 import { CacheModule } from '@nestjs/cache-manager';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './application/modules/auth.module';
+import { ReportsModule } from './application/modules/reports.module';
 import { AdminModule } from './application/modules/admin.module';
 import { ShiftModule } from './application/modules/shift.module';
 import { HealthModule } from './application/modules/health.module';
@@ -83,8 +86,20 @@ import { HttpExceptionFilter } from './presentation/filters/http-exception.filte
           ttl: config.get<number>('THROTTLE_AUTH_TTL', 60) * 1000,
           limit: config.get<number>('THROTTLE_AUTH_LIMIT', 5),
         },
+        {
+          name: 'admin',
+          ttl: 60 * 1000,
+          limit: 100,
+        },
       ],
     }),
+    ScheduleModule.forRoot(),
+    ...(process.env.BULL_REDIS_URL
+      ? [
+          BullModule.forRoot({ connection: { url: process.env.BULL_REDIS_URL } }),
+          ReportsModule,
+        ]
+      : []),
     AuthModule,
     AdminModule,
     ShiftModule,

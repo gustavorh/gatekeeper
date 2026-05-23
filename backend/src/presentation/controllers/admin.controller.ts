@@ -10,13 +10,12 @@ import {
   UseGuards,
   HttpCode,
   HttpStatus,
-  ValidationPipe,
-  UsePipes,
-  BadRequestException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AdminService } from '../../application/services/admin.service';
 import { ShiftService } from '../../application/services/shift.service';
 import { AdminAuthGuard } from '../middleware/admin-auth.guard';
+import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
 import {
   CreateUserAdminDto,
   UpdateUserAdminDto,
@@ -32,6 +31,7 @@ import {
   RoleResponseDto,
   PermissionResponseDto,
   UserListWithRolesResponse,
+  UserWithRolesResponseDto,
 } from '../../application/dto/admin.dto';
 import {
   AckResponseDto,
@@ -60,15 +60,7 @@ import {
  */
 @ApiTags('admin')
 @Controller('admin')
-@UseGuards(AdminAuthGuard)
-@UsePipes(
-  new ValidationPipe({
-    transform: true,
-    whitelist: true,
-    forbidNonWhitelisted: true,
-    errorHttpStatusCode: HttpStatus.BAD_REQUEST,
-  }),
-)
+@UseGuards(JwtAuthGuard, AdminAuthGuard)
 @ApiBearerAuth('JWT-auth')
 @ApiUnauthorizedResponse({
   description: 'Unauthorized - Invalid or missing JWT token',
@@ -97,14 +89,7 @@ export class AdminController {
     type: DashboardDataDto,
   })
   async getDashboardData() {
-    try {
-      return await this.adminService.getDashboardData();
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to retrieve dashboard data',
-        error: error.message,
-      });
-    }
+    return this.adminService.getDashboardData();
   }
 
   // ===================================
@@ -133,18 +118,12 @@ export class AdminController {
   async createUser(
     @Body() createUserDto: CreateUserAdminDto,
   ): Promise<UserResponseDto> {
-    try {
-      return await this.adminService.createUser(createUserDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'User creation failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.createUser(createUserDto);
   }
 
   @Get('users')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ admin: { limit: 100, ttl: 60000 } })
   @ApiOperation({
     summary: 'Get all users with pagination',
     description:
@@ -207,10 +186,13 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'User with roles retrieved successfully',
+    type: UserWithRolesResponseDto,
   })
   @ApiNotFoundResponse({ description: 'User not found' })
-  async getUserWithRoles(@Param('id') id: string): Promise<any> {
-    return await this.adminService.getUserWithRoles(id);
+  async getUserWithRoles(
+    @Param('id') id: string,
+  ): Promise<UserWithRolesResponseDto> {
+    return this.adminService.getUserWithRoles(id);
   }
 
   @Put('users/:id')
@@ -238,14 +220,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() updateUserDto: UpdateUserAdminDto,
   ): Promise<UserResponseDto> {
-    try {
-      return await this.adminService.updateUser(id, updateUserDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'User update failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.updateUser(id, updateUserDto);
   }
 
   @Delete('users/:id')
@@ -297,14 +272,7 @@ export class AdminController {
   async createRole(
     @Body() createRoleDto: CreateRoleAdminDto,
   ): Promise<RoleResponseDto> {
-    try {
-      return await this.adminService.createRole(createRoleDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Role creation failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.createRole(createRoleDto);
   }
 
   @Get('roles')
@@ -402,14 +370,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() updateRoleDto: UpdateRoleAdminDto,
   ): Promise<RoleResponseDto> {
-    try {
-      return await this.adminService.updateRole(id, updateRoleDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Role update failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.updateRole(id, updateRoleDto);
   }
 
   @Delete('roles/:id')
@@ -460,14 +421,7 @@ export class AdminController {
   async createPermission(
     @Body() createPermissionDto: CreatePermissionAdminDto,
   ): Promise<PermissionResponseDto> {
-    try {
-      return await this.adminService.createPermission(createPermissionDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Permission creation failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.createPermission(createPermissionDto);
   }
 
   @Get('permissions')
@@ -549,14 +503,7 @@ export class AdminController {
     @Param('id') id: string,
     @Body() updatePermissionDto: UpdatePermissionAdminDto,
   ): Promise<PermissionResponseDto> {
-    try {
-      return await this.adminService.updatePermission(id, updatePermissionDto);
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Permission update failed',
-        error: error.message,
-      });
-    }
+    return this.adminService.updatePermission(id, updatePermissionDto);
   }
 
   @Delete('permissions/:id')
@@ -616,22 +563,12 @@ export class AdminController {
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
   ): Promise<{ shifts: any[]; total: number }> {
-    try {
-      const result = await this.shiftService.getAllActiveShifts(
-        limit || 50,
-        offset || 0,
-      );
-      return result;
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to retrieve active shifts',
-        error: error.message,
-      });
-    }
+    return this.shiftService.getAllActiveShifts(limit || 50, offset || 0);
   }
 
   @Get('shifts')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ admin: { limit: 100, ttl: 60000 } })
   @ApiOperation({
     summary: 'Get all shifts',
     description:
@@ -681,34 +618,18 @@ export class AdminController {
     @Query('endDate') endDate?: string,
     @Query('status') status?: string,
   ): Promise<{ shifts: any[]; total: number }> {
-    try {
-      // Check if filters are provided
-      const hasFilters = startDate || endDate || status;
-
-      if (hasFilters) {
-        const filters: ShiftFilters = {};
-        if (startDate) filters.startDate = startDate;
-        if (endDate) filters.endDate = endDate;
-        if (status) filters.status = status as ShiftStatus;
-
-        const result = await this.shiftService.getAllShiftsWithFilters(
-          filters,
-          limit || 50,
-          offset || 0,
-        );
-        return result;
-      } else {
-        const result = await this.shiftService.getAllShifts(
-          limit || 50,
-          offset || 0,
-        );
-        return result;
-      }
-    } catch (error) {
-      throw new BadRequestException({
-        message: 'Failed to retrieve shifts',
-        error: error.message,
-      });
+    const hasFilters = startDate || endDate || status;
+    if (hasFilters) {
+      const filters: ShiftFilters = {};
+      if (startDate) filters.startDate = startDate;
+      if (endDate) filters.endDate = endDate;
+      if (status) filters.status = status as ShiftStatus;
+      return this.shiftService.getAllShiftsWithFilters(
+        filters,
+        limit || 50,
+        offset || 0,
+      );
     }
+    return this.shiftService.getAllShifts(limit || 50, offset || 0);
   }
 }
