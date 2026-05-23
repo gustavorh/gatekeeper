@@ -1,19 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import { apiClient } from "@/lib/api";
+import { useMemo, useState } from "react";
+import useSWR from "swr";
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
-import { Shift, ShiftHistoryResponse, ShiftFilters } from "@/types";
+import { ShiftHistoryResponse, ShiftFilters } from "@/types";
 import { formatDate, formatTime, formatTimeOnly } from "@/lib/utils";
 
 export default function TurnosPage() {
-  const [shifts, setShifts] = useState<Shift[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [totalShifts, setTotalShifts] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<Omit<ShiftFilters, "page">>({
     startDate: "",
@@ -22,46 +18,27 @@ export default function TurnosPage() {
     limit: 10,
   });
 
-  const fetchShifts = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const params = new URLSearchParams();
-      params.append("limit", filters.limit.toString());
-      params.append("offset", ((currentPage - 1) * filters.limit).toString());
-
-      if (filters.startDate) {
-        params.append("startDate", filters.startDate);
-      }
-      if (filters.endDate) {
-        params.append("endDate", filters.endDate);
-      }
-      if (filters.status) {
-        params.append("status", filters.status);
-      }
-
-      const response = await apiClient.get<ShiftHistoryResponse>(
-        `/shifts/history?${params.toString()}`
-      );
-
-      if (response.success && response.data) {
-        setShifts(response.data.shifts);
-        setTotalShifts(response.data.total);
-      } else {
-        setError("Error al cargar los turnos");
-      }
-    } catch (err) {
-      console.error("Error fetching shifts:", err);
-      setError("Error al cargar los turnos");
-    } finally {
-      setLoading(false);
-    }
+  const queryKey = useMemo(() => {
+    const params = new URLSearchParams();
+    params.append("limit", filters.limit.toString());
+    params.append("offset", ((currentPage - 1) * filters.limit).toString());
+    if (filters.startDate) params.append("startDate", filters.startDate);
+    if (filters.endDate) params.append("endDate", filters.endDate);
+    if (filters.status) params.append("status", filters.status);
+    return `/shifts/history?${params.toString()}`;
   }, [currentPage, filters]);
 
-  useEffect(() => {
-    fetchShifts();
-  }, [fetchShifts]);
+  const { data, error: swrError, isLoading, mutate } =
+    useSWR<ShiftHistoryResponse>(queryKey);
+
+  const shifts = data?.shifts ?? [];
+  const totalShifts = data?.total ?? 0;
+  const loading = isLoading;
+  const error = swrError ? "Error al cargar los turnos" : null;
+
+  const fetchShifts = () => {
+    void mutate();
+  };
 
   const handleFilterChange = (
     key: keyof Omit<ShiftFilters, "page">,
