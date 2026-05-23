@@ -8,7 +8,9 @@ import {
   ValidationPipe,
   UsePipes,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import { Response } from 'express';
 import { AuthService } from '../../application/services/auth.service';
 import { LoginDto, RegisterDto } from '../../application/dto/auth.dto';
 import { ChangePasswordDto } from '../../application/dto/profile.dto';
@@ -46,6 +48,29 @@ import { Throttle } from '@nestjs/throttler';
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
+  private setAuthCookies(res: Response, token: string) {
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('auth_token', token, {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+    res.cookie('gk-auth', '1', {
+      httpOnly: false,
+      secure: isProd,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 24 * 60 * 60 * 1000,
+    });
+  }
+
+  private clearAuthCookies(res: Response) {
+    res.clearCookie('auth_token', { path: '/' });
+    res.clearCookie('gk-auth', { path: '/' });
+  }
+
   /**
    * User login endpoint
    * Validates input using LoginDto at presentation layer
@@ -78,9 +103,14 @@ export class AuthController {
     status: 401,
     description: 'Unauthorized - Invalid credentials',
   })
-  async login(@Body() loginDto: LoginDto): Promise<AuthResponse> {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponse> {
     try {
-      return await this.authService.login(loginDto);
+      const auth = await this.authService.login(loginDto);
+      this.setAuthCookies(res, auth.token);
+      return auth;
     } catch (error) {
       throw new BadRequestException({
         message: 'Login failed',
@@ -121,9 +151,14 @@ export class AuthController {
     status: 409,
     description: 'Conflict - User with this RUT or email already exists',
   })
-  async register(@Body() registerDto: RegisterDto): Promise<AuthResponse> {
+  async register(
+    @Body() registerDto: RegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthResponse> {
     try {
-      return await this.authService.register(registerDto);
+      const auth = await this.authService.register(registerDto);
+      this.setAuthCookies(res, auth.token);
+      return auth;
     } catch (error) {
       throw new BadRequestException({
         message: 'Registration failed',
@@ -183,5 +218,20 @@ export class AuthController {
         error: error.message,
       });
     }
+  }
+
+  @Post('logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Logout',
+    description:
+      'Clears the auth_token and gk-auth cookies so subsequent requests are unauthenticated.',
+  })
+  @ApiResponse({ status: 200, description: 'Session cleared' })
+  logout(
+    @Res({ passthrough: true }) res: Response,
+  ): { success: boolean; message: string } {
+    this.clearAuthCookies(res);
+    return { success: true, message: 'Logged out' };
   }
 }

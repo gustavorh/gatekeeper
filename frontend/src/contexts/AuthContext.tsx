@@ -151,6 +151,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
     clearAuthCookie();
+    void apiClient.logout().catch(() => undefined);
   };
 
   const value: AuthContextType = {

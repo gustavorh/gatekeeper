@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -23,6 +24,8 @@ async function bootstrap() {
   );
 
   const configService = app.get(ConfigService);
+
+  app.use(cookieParser());
 
   app.use(
     helmet({

@@ -23,6 +23,7 @@ class ApiClient {
         : null;
 
     const config: RequestInit = {
+      credentials: "include",
       headers: {
         "Content-Type": "application/json",
         ...(token && { Authorization: `Bearer ${token}` }),
@@ -80,6 +81,10 @@ class ApiClient {
       method: "PUT",
       body: JSON.stringify(userData),
     });
+  }
+
+  async logout() {
+    return this.request("/auth/logout", { method: "POST" });
   }
 
   // Generic methods for other endpoints
