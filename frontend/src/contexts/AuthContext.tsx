@@ -21,6 +21,25 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const AUTH_COOKIE = "gk-auth";
+
+function setAuthCookie(token: string) {
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    const expSeconds = typeof payload.exp === "number" ? payload.exp : null;
+    const maxAge = expSeconds
+      ? Math.max(0, expSeconds - Math.floor(Date.now() / 1000))
+      : 60 * 60 * 24;
+    document.cookie = `${AUTH_COOKIE}=1; Max-Age=${maxAge}; Path=/; SameSite=Lax`;
+  } catch {
+    document.cookie = `${AUTH_COOKIE}=1; Path=/; SameSite=Lax`;
+  }
+}
+
+function clearAuthCookie() {
+  document.cookie = `${AUTH_COOKIE}=; Max-Age=0; Path=/; SameSite=Lax`;
+}
+
 interface AuthProviderProps {
   children: ReactNode;
 }
@@ -48,23 +67,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       try {
         const token = localStorage.getItem("accessToken");
         if (token && !isTokenExpired(token)) {
+          setAuthCookie(token);
           const response = await apiClient.getCurrentUser();
           if (response.success && response.data) {
             setUser(response.data as User);
           } else {
-            // Token is invalid, clear it
             localStorage.removeItem("accessToken");
             localStorage.removeItem("refreshToken");
+            clearAuthCookie();
           }
         } else if (token && isTokenExpired(token)) {
-          // Token is expired, clear it
           localStorage.removeItem("accessToken");
           localStorage.removeItem("refreshToken");
+          clearAuthCookie();
         }
       } catch (error) {
         console.error("Failed to initialize auth:", error);
         localStorage.removeItem("accessToken");
         localStorage.removeItem("refreshToken");
+        clearAuthCookie();
       } finally {
         setIsLoading(false);
       }
@@ -79,17 +100,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiClient.login(credentials);
 
       if (response.success && response.data) {
-        // The backend wraps the AuthResponse in response.data
         const authData = response.data as AuthResponse;
 
-        // Store tokens
         localStorage.setItem("accessToken", authData.token);
-        // Note: refreshToken might not be available in all responses
         if (authData.refreshToken) {
           localStorage.setItem("refreshToken", authData.refreshToken);
         }
+        setAuthCookie(authData.token);
 
-        // Set user
         setUser(authData.user);
       } else {
         throw new Error(response.message || "Login failed");
@@ -108,17 +126,14 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const response = await apiClient.register(data);
 
       if (response.success && response.data) {
-        // The backend wraps the AuthResponse in response.data
         const authData = response.data as AuthResponse;
 
-        // Store tokens
         localStorage.setItem("accessToken", authData.token);
-        // Note: refreshToken might not be available in all responses
         if (authData.refreshToken) {
           localStorage.setItem("refreshToken", authData.refreshToken);
         }
+        setAuthCookie(authData.token);
 
-        // Set user
         setUser(authData.user);
       } else {
         throw new Error(response.message || "Registration failed");
@@ -132,10 +147,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   const logout = () => {
-    // Clear local state and tokens
     setUser(null);
     localStorage.removeItem("accessToken");
     localStorage.removeItem("refreshToken");
+    clearAuthCookie();
   };
 
   const value: AuthContextType = {

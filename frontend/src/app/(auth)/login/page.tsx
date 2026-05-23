@@ -1,73 +1,43 @@
 "use client";
 
-import React, { useState } from "react";
-import { useRouter } from "next/navigation";
+import React, { Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNotification } from "@/contexts/NotificationContext";
-import { LoginCredentials } from "@/types";
+import { loginSchema, type LoginFormValues } from "@/lib/schemas/auth";
 
 export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageInner />
+    </Suspense>
+  );
+}
+
+function LoginPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login, isLoading } = useAuth();
   const { showSuccess, showError } = useNotification();
-
-  const [formData, setFormData] = useState<LoginCredentials>({
-    rut: "",
-    password: "",
-  });
-
-  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showPassword, setShowPassword] = useState(false);
 
-  // RUT validation function
-  const validateRut = (rut: string): boolean => {
-    // Remove dots and dash, convert to uppercase
-    const cleanRut = rut.replace(/[.-]/g, "").toUpperCase();
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isSubmitting },
+  } = useForm<LoginFormValues>({
+    resolver: zodResolver(loginSchema),
+    defaultValues: { rut: "", password: "" },
+  });
 
-    // Check if it has the correct length (8-9 digits + verification digit)
-    if (cleanRut.length < 8 || cleanRut.length > 9) {
-      return false;
-    }
-
-    // Check if it contains only numbers and 'K'
-    if (!/^[0-9]+K?$/.test(cleanRut)) {
-      return false;
-    }
-
-    return true;
-  };
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {};
-
-    if (!formData.rut) {
-      newErrors.rut = "RUT is required";
-    } else if (!validateRut(formData.rut)) {
-      newErrors.rut =
-        "Please enter a valid RUT format (e.g., 12345678-9 or 123456789)";
-    }
-
-    if (!formData.password) {
-      newErrors.password = "Password is required";
-    } else if (formData.password.length < 6) {
-      newErrors.password = "Password must be at least 6 characters";
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!validateForm()) {
-      return;
-    }
-
+  const onSubmit = async (values: LoginFormValues) => {
     try {
-      await login(formData);
+      await login(values);
       showSuccess("¡Bienvenido de vuelta! Has iniciado sesión exitosamente.");
-      router.push("/dashboard");
+      const from = searchParams.get("from");
+      router.push(from && from.startsWith("/") ? from : "/dashboard");
     } catch (error) {
       showError(
         error instanceof Error
@@ -77,27 +47,11 @@ export default function LoginPage() {
     }
   };
 
-  const handleInputChange =
-    (field: keyof LoginCredentials) =>
-    (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({
-        ...prev,
-        [field]: e.target.value,
-      }));
-
-      // Clear error when user starts typing
-      if (errors[field]) {
-        setErrors((prev) => ({
-          ...prev,
-          [field]: "",
-        }));
-      }
-    };
+  const busy = isLoading || isSubmitting;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
             <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center">
@@ -105,6 +59,7 @@ export default function LoginPage() {
                 className="w-6 h-6 text-white"
                 fill="currentColor"
                 viewBox="0 0 20 20"
+                aria-hidden="true"
               >
                 <path
                   fillRule="evenodd"
@@ -118,9 +73,7 @@ export default function LoginPage() {
           <p className="text-gray-600 mt-2">Control de Acceso</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* RUT Input */}
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6" noValidate>
           <div>
             <label
               htmlFor="rut"
@@ -131,19 +84,21 @@ export default function LoginPage() {
             <input
               type="text"
               id="rut"
-              value={formData.rut}
-              onChange={handleInputChange("rut")}
               placeholder="12345678-9"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors text-gray-900 placeholder-gray-500"
               autoFocus
-              disabled={isLoading}
+              disabled={busy}
+              aria-invalid={!!errors.rut}
+              aria-describedby={errors.rut ? "rut-error" : undefined}
+              {...register("rut")}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors text-gray-900 placeholder-gray-500"
             />
             {errors.rut && (
-              <p className="mt-1 text-sm text-red-600">{errors.rut}</p>
+              <p id="rut-error" className="mt-1 text-sm text-red-600">
+                {errors.rut.message}
+              </p>
             )}
           </div>
 
-          {/* Password Input */}
           <div>
             <label
               htmlFor="password"
@@ -155,17 +110,21 @@ export default function LoginPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 id="password"
-                value={formData.password}
-                onChange={handleInputChange("password")}
                 placeholder="Ingresa tu contraseña"
+                disabled={busy}
+                aria-invalid={!!errors.password}
+                aria-describedby={errors.password ? "password-error" : undefined}
+                {...register("password")}
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-colors pr-12 text-gray-900 placeholder-gray-500"
-                disabled={isLoading}
               />
               <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((v) => !v)}
+                disabled={busy}
+                aria-label={
+                  showPassword ? "Ocultar contraseña" : "Mostrar contraseña"
+                }
                 className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                disabled={isLoading}
               >
                 {showPassword ? (
                   <svg
@@ -173,6 +132,7 @@ export default function LoginPage() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -187,6 +147,7 @@ export default function LoginPage() {
                     fill="none"
                     stroke="currentColor"
                     viewBox="0 0 24 24"
+                    aria-hidden="true"
                   >
                     <path
                       strokeLinecap="round"
@@ -205,18 +166,19 @@ export default function LoginPage() {
               </button>
             </div>
             {errors.password && (
-              <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+              <p id="password-error" className="mt-1 text-sm text-red-600">
+                {errors.password.message}
+              </p>
             )}
           </div>
 
-          {/* Remember Me and Forgot Password */}
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <input
                 type="checkbox"
                 id="remember"
                 className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                disabled={isLoading}
+                disabled={busy}
               />
               <label htmlFor="remember" className="ml-2 text-sm text-gray-700">
                 Recordarme
@@ -225,28 +187,26 @@ export default function LoginPage() {
             <button
               type="button"
               className="text-sm text-blue-600 hover:text-blue-800"
-              disabled={isLoading}
+              disabled={busy}
             >
               ¿Olvidaste tu contraseña?
             </button>
           </div>
 
-          {/* Login Button */}
           <button
             type="submit"
-            disabled={isLoading}
+            disabled={busy}
             className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? "Iniciando sesión..." : "Iniciar Sesión"}
+            {busy ? "Iniciando sesión..." : "Iniciar Sesión"}
           </button>
 
-          {/* Contact Support */}
           <div className="text-center text-sm text-gray-600">
             ¿No tienes una cuenta?{" "}
             <button
               type="button"
               className="text-blue-600 hover:text-blue-800"
-              disabled={isLoading}
+              disabled={busy}
             >
               Contactar Soporte
             </button>
