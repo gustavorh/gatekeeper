@@ -46,7 +46,7 @@ Leyenda de prioridad:
 ### Frontend (Next.js)
 
 - **Server Actions** en formularios de mutación (crear usuario, marcar turno, asignar rol) — reduce cliente bundle y mejora UX.
-- **Streaming + Suspense + `loading.tsx`** en dashboards de analytics.
+- **Server Components reales en dashboard** — la migración parcial ya hecha (SWR + dedup + `loading.tsx`/`error.tsx` por segment) cubre la UX de streaming, pero el dashboard sigue siendo client component porque depende de `AuthContext`. Convertirlo a Server Component requiere reemplazar `AuthContext` por lectura del usuario desde la cookie `auth_token` en server side (`cookies().get('auth_token')` + verify), y trasladar `apiClient.get` a `fetch` con `revalidate: 60`. Owner: `frontend-developer`.
 - **`next/image`** para logos y avatares; activar `output: 'standalone'` en `next.config.ts` para imágenes Docker más pequeñas.
 - **Suspense boundary por sección** en `/admin` y `/dashboard`.
 

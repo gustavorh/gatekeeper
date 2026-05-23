@@ -8,31 +8,12 @@ import Sidebar from "@/components/Sidebar";
 import Footer from "@/components/Footer";
 import { apiClient } from "@/lib/api";
 import { useState, useEffect } from "react";
-
-// Analytics data types
-interface WorkHoursSummary {
-  totalWorkedHours: number;
-  totalLunchTime: number;
-  totalBreakTime: number;
-  daysWorked: number;
-  averageWorkedHoursPerDay: number;
-  averageLunchTimePerDay: number;
-  period: "week" | "month";
-  startDate: string;
-  endDate: string;
-  dailyBreakdown: DailyWorkHours[];
-}
-
-interface DailyWorkHours {
-  date: string;
-  workedHours: number;
-  lunchTime: number;
-  breakTime: number;
-  clockInTime: string;
-  clockOutTime?: string;
-  lunchStartTime?: string;
-  lunchEndTime?: string;
-}
+import { mutate } from "swr";
+import {
+  ANALYTICS_KEYS,
+  useMonthlyAnalytics,
+  useWeeklyAnalytics,
+} from "@/lib/hooks/use-analytics";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -50,12 +31,18 @@ export default function DashboardPage() {
   const [recentActivities, setRecentActivities] = useState<any[]>([]);
   const [loadingActivities, setLoadingActivities] = useState(true);
 
-  // Analytics states
-  const [weeklyAnalytics, setWeeklyAnalytics] =
-    useState<WorkHoursSummary | null>(null);
-  const [monthlyAnalytics, setMonthlyAnalytics] =
-    useState<WorkHoursSummary | null>(null);
-  const [loadingAnalytics, setLoadingAnalytics] = useState(true);
+  const { data: weeklyAnalytics, isLoading: loadingWeekly } =
+    useWeeklyAnalytics();
+  const { data: monthlyAnalytics, isLoading: loadingMonthly } =
+    useMonthlyAnalytics();
+  const loadingAnalytics = loadingWeekly || loadingMonthly;
+
+  const refreshAnalytics = async () => {
+    await Promise.all([
+      mutate(ANALYTICS_KEYS.week),
+      mutate(ANALYTICS_KEYS.month),
+    ]);
+  };
 
   // Fetch current shift status on component mount
   useEffect(() => {
@@ -117,32 +104,8 @@ export default function DashboardPage() {
       }
     };
 
-    const fetchAnalytics = async () => {
-      try {
-        setLoadingAnalytics(true);
-
-        // Fetch weekly analytics
-        const weeklyResponse = await apiClient.get(
-          "/analytics/work-hours/current-week"
-        );
-        setWeeklyAnalytics(weeklyResponse.data as WorkHoursSummary);
-
-        // Fetch monthly analytics
-        const monthlyResponse = await apiClient.get(
-          "/analytics/work-hours/current-month"
-        );
-        setMonthlyAnalytics(monthlyResponse.data as WorkHoursSummary);
-      } catch (error) {
-        console.error("Error fetching analytics:", error);
-        showError("Error al cargar estadísticas");
-      } finally {
-        setLoadingAnalytics(false);
-      }
-    };
-
     fetchCurrentShift();
     fetchRecentActivities();
-    fetchAnalytics();
   }, []);
 
   // Helper function to get shift display information
@@ -268,28 +231,6 @@ export default function DashboardPage() {
       }
     } catch (error) {
       console.error("Error refreshing activities:", error);
-    }
-  };
-
-  const refreshAnalytics = async () => {
-    try {
-      setLoadingAnalytics(true);
-
-      // Fetch weekly analytics
-      const weeklyResponse = await apiClient.get(
-        "/analytics/work-hours/current-week"
-      );
-      setWeeklyAnalytics(weeklyResponse.data as WorkHoursSummary);
-
-      // Fetch monthly analytics
-      const monthlyResponse = await apiClient.get(
-        "/analytics/work-hours/current-month"
-      );
-      setMonthlyAnalytics(monthlyResponse.data as WorkHoursSummary);
-    } catch (error) {
-      console.error("Error refreshing analytics:", error);
-    } finally {
-      setLoadingAnalytics(false);
     }
   };
 
