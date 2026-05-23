@@ -8,6 +8,10 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import {
+  AUTH_TOKEN_COOKIE,
+  AUTH_TOKEN_COOKIE_FALLBACK,
+} from '../../application/constants/auth-cookies';
 
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
@@ -55,9 +59,9 @@ export class JwtAuthGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     if (type === 'Bearer' && token) return token;
-    const cookieToken = (
+    const cookies = (
       request as Request & { cookies?: Record<string, string> }
-    ).cookies?.auth_token;
-    return cookieToken;
+    ).cookies;
+    return cookies?.[AUTH_TOKEN_COOKIE] ?? cookies?.[AUTH_TOKEN_COOKIE_FALLBACK];
   }
 }

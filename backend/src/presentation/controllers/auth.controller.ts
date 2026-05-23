@@ -30,6 +30,11 @@ import {
   ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
+import {
+  AUTH_TOKEN_COOKIE,
+  AUTH_TOKEN_COOKIE_FALLBACK,
+  GK_AUTH_SIGNAL_COOKIE,
+} from '../../application/constants/auth-cookies';
 
 /**
  * Authentication controller
@@ -50,14 +55,14 @@ export class AuthController {
 
   private setAuthCookies(res: Response, token: string) {
     const isProd = process.env.NODE_ENV === 'production';
-    res.cookie('auth_token', token, {
+    res.cookie(AUTH_TOKEN_COOKIE, token, {
       httpOnly: true,
       secure: isProd,
       sameSite: 'lax',
       path: '/',
       maxAge: 24 * 60 * 60 * 1000,
     });
-    res.cookie('gk-auth', '1', {
+    res.cookie(GK_AUTH_SIGNAL_COOKIE, '1', {
       httpOnly: false,
       secure: isProd,
       sameSite: 'lax',
@@ -67,8 +72,11 @@ export class AuthController {
   }
 
   private clearAuthCookies(res: Response) {
-    res.clearCookie('auth_token', { path: '/' });
-    res.clearCookie('gk-auth', { path: '/' });
+    res.clearCookie(AUTH_TOKEN_COOKIE, { path: '/' });
+    if (AUTH_TOKEN_COOKIE !== AUTH_TOKEN_COOKIE_FALLBACK) {
+      res.clearCookie(AUTH_TOKEN_COOKIE_FALLBACK, { path: '/' });
+    }
+    res.clearCookie(GK_AUTH_SIGNAL_COOKIE, { path: '/' });
   }
 
   /**
