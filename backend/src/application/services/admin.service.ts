@@ -5,6 +5,8 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
@@ -52,7 +54,13 @@ export class AdminService {
     @Inject('IPermissionRepository')
     private readonly permissionRepository: IPermissionRepository,
     private readonly authService: AuthService,
+    @Inject(CACHE_MANAGER)
+    private readonly cache: Cache,
   ) {}
+
+  private async invalidateUserCache(userId: string): Promise<void> {
+    await this.cache.del(`user:${userId}:withRoles`);
+  }
 
   // User Management
   async createUser(createUserDto: CreateUserAdminDto): Promise<User> {
@@ -221,6 +229,8 @@ export class AdminService {
       }
     }
 
+    await this.invalidateUserCache(id);
+
     return updatedUser;
   }
 
@@ -229,6 +239,8 @@ export class AdminService {
     if (!existingUser) {
       throw new NotFoundException('User not found');
     }
+
+    await this.invalidateUserCache(id);
 
     // First, delete all user_roles records associated with the user
     await this.roleRepository.removeAllUserRoles(id);

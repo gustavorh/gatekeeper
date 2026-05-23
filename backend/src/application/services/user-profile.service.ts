@@ -4,16 +4,22 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
+import { Cache } from 'cache-manager';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
-import { User } from '../../domain/entities/user.entity';
 import {
   UserWithRolesResponse,
   RoleResponse,
-  PermissionResponse,
 } from '../dto/response.dto';
 import { UpdateProfileDto, ProfileUpdateResponse } from '../dto/profile.dto';
+
+const userWithRolesKey = (userId: string) => `user:${userId}:withRoles`;
+export const USER_WITH_ROLES_CACHE = {
+  key: userWithRolesKey,
+  ttl: 5 * 60 * 1000,
+};
 
 @Injectable()
 export class UserProfileService {
@@ -24,21 +30,23 @@ export class UserProfileService {
     private readonly roleRepository: IRoleRepository,
     @Inject('IPermissionRepository')
     private readonly permissionRepository: IPermissionRepository,
+    @Inject(CACHE_MANAGER)
+    private readonly cache: Cache,
   ) {}
 
   async getUserWithRoles(
     userId: string,
   ): Promise<UserWithRolesResponse | null> {
+    const cached = await this.cache.get<UserWithRolesResponse>(
+      userWithRolesKey(userId),
+    );
+    if (cached) return cached;
+
     const user = await this.userRepository.findById(userId);
+    if (!user) return null;
 
-    if (!user) {
-      return null;
-    }
-
-    // Obtener roles del usuario
     const userRoles = await this.roleRepository.findUserRoles(userId);
 
-    // Para cada rol, obtener sus permisos
     const rolesWithPermissions: RoleResponse[] = await Promise.all(
       userRoles.map(async (role) => {
         const permissions =
@@ -65,7 +73,7 @@ export class UserProfileService {
       }),
     );
 
-    return {
+    const response: UserWithRolesResponse = {
       id: user.id,
       rut: user.rut,
       email: user.email,
@@ -76,6 +84,18 @@ export class UserProfileService {
       updatedAt: user.updatedAt,
       roles: rolesWithPermissions,
     };
+
+    await this.cache.set(
+      userWithRolesKey(userId),
+      response,
+      USER_WITH_ROLES_CACHE.ttl,
+    );
+
+    return response;
+  }
+
+  async invalidateUserCache(userId: string): Promise<void> {
+    await this.cache.del(userWithRolesKey(userId));
   }
 
   async updateProfile(
@@ -106,6 +126,8 @@ export class UserProfileService {
       userId,
       updateProfileDto,
     );
+
+    await this.invalidateUserCache(userId);
 
     return {
       id: updatedUser.id,
