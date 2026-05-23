@@ -25,7 +25,9 @@ import {
   ApiUnauthorizedResponse,
   ApiBadRequestResponse,
   ApiNotFoundResponse,
+  ApiTooManyRequestsResponse,
 } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 
 /**
  * Authentication controller
@@ -50,6 +52,10 @@ export class AuthController {
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many login attempts — rate limit exceeded',
+  })
   @ApiOperation({
     summary: 'User login',
     description:
@@ -89,6 +95,10 @@ export class AuthController {
    */
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
+  @Throttle({ auth: { limit: 3, ttl: 60000 } })
+  @ApiTooManyRequestsResponse({
+    description: 'Too many registration attempts — rate limit exceeded',
+  })
   @ApiOperation({
     summary: 'User registration',
     description:
@@ -129,6 +139,7 @@ export class AuthController {
   @Post('change-password')
   @HttpCode(HttpStatus.OK)
   @UseGuards(JwtAuthGuard)
+  @Throttle({ auth: { limit: 5, ttl: 60000 } })
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Change user password',

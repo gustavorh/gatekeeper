@@ -7,30 +7,24 @@ import { LoggingInterceptor } from './presentation/interceptors/logging.intercep
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
 
-  // Global validation pipe configuration
-  // This ensures all incoming requests are validated at the presentation layer
+  app.enableShutdownHooks();
+
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true, // Automatically transform payloads to DTO instances
-      whitelist: true, // Strip properties that don't have decorators
-      forbidNonWhitelisted: true, // Throw errors if non-whitelisted values are provided
-      errorHttpStatusCode: 400, // Return 400 Bad Request for validation errors
-      disableErrorMessages: false, // Include detailed error messages
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      errorHttpStatusCode: 400,
+      disableErrorMessages: false,
     }),
   );
 
-  // Global logging interceptor
   app.useGlobalInterceptors(new LoggingInterceptor());
 
-  // Health check endpoint
-  app
-    .getHttpAdapter()
-    .getInstance()
-    .get('/health', (_req, res) => res.status(200).send({ ok: true }));
-
-  // Enable CORS for frontend integration
   app.enableCors({
-    origin: [process.env.FRONTEND_URL, 'http://localhost:8000'],
+    origin: [process.env.FRONTEND_URL, 'http://localhost:8000'].filter(
+      (o): o is string => Boolean(o),
+    ),
     credentials: true,
   });
 
