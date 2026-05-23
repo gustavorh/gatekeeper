@@ -28,6 +28,7 @@ Leyenda de prioridad:
 
 ### Producto / Diseño
 
+- **Tabla `organizations` + `user_organizations`** — completa la multi-tenancy real. Hoy el JWT carga `organizationId: 'gatekeeper-default'` y el guard lo valida, pero no hay tablas que respalden el modelo. Requiere migración Drizzle, seed del tenant default, backfill de `shifts` y actualización del flujo de login para elegir org. Owner: `backend-developer`. **Bloqueante para auditoría/compliance B2B real.**
 - **Audit logs** (`audit_logs` tabla + interceptor) — quién hizo qué y cuándo. Requisito implícito para B2B y compliance. Owner: `backend-developer`.
 - **Implementar design system completo** (`components/ui/`) — hoy hay componentes ad-hoc; `docs/product/design-system.md` define tokens y patrones. Owner: `frontend-developer`.
 - **Coherencia de idioma por pantalla** — el repo mezcla ES/EN. Decisión de producto: ¿ES por defecto en todo? Owner: `product-manager` + `frontend-developer`.

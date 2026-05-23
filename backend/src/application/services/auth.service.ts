@@ -184,6 +184,10 @@ export class AuthService implements IAuthService {
       sub: user.id,
       rut: user.rut,
       email: user.email,
+      // Multi-tenant claim. Until the organizations table lands every user
+      // gets the placeholder default; once it does, swap this for the user's
+      // active organization id from user_organizations.
+      organizationId: 'gatekeeper-default',
     };
 
     return this.jwtService.sign(payload);

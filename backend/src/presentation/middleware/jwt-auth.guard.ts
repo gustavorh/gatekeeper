@@ -35,8 +35,16 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      // Guardar el usuario completo en request.user
-      request['user'] = user;
+      const organizationId =
+        payload.organizationId || 'gatekeeper-default';
+      if (!organizationId) {
+        throw new UnauthorizedException('No active organization in session');
+      }
+
+      request['user'] = {
+        ...user,
+        organizationId,
+      };
     } catch {
       throw new UnauthorizedException();
     }
