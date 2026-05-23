@@ -21,6 +21,16 @@ Leyenda de prioridad:
 | 3 | **Validación de env vars con Joi** (`@nestjs/config` + schema) | Backend | ✅ Implementado | Falla en startup si faltan `JWT_SECRET`, `DATABASE_URL`, etc. |
 | 4 | **Middleware edge para auth** (`frontend/src/middleware.ts`) | Frontend | ✅ Implementado | Redirige antes de hidratación, reemplaza `ProtectedRoute` cliente para rutas obvias |
 | 5 | **react-hook-form + zod** en formularios críticos (login) | Frontend | ✅ Implementado | Validación tipada compartible con backend |
+| 6 | **@nestjs/event-emitter** para shift domain events | Backend | ✅ Implementado | `shift.clocked-in/out/completed` desacoplados; `ShiftAuditListener` para observabilidad |
+| 7 | **@nestjs/cache-manager** en perfil de usuario | Backend | ✅ Implementado | `user:<id>:withRoles` cacheado 5 min; invalidado en update/delete |
+| 8 | **nestjs-pino** logger estructurado | Backend | ✅ Implementado | JSON en prod, request-id propagado; reemplaza console.log |
+| 9 | **Graceful shutdown** MySQL pool | Backend | ✅ Implementado | `OnApplicationShutdown` en DatabaseModule; pool compartido (bug doble pool corregido) |
+| 10 | **`__Host-` cookie prefix** en producción | Backend | ✅ Implementado | `AUTH_TOKEN_COOKIE` usa prefijo en prod; guard lee ambos nombres |
+| 11 | **JWT exp validation en edge middleware** | Frontend | ✅ Implementado | `jwtLooksFresh()` decodifica base64url y verifica `exp` antes de hidratación |
+| 12 | **SWR hooks** para data fetching | Frontend | ✅ Implementado | `useWeeklyAnalytics`, `useMonthlyAnalytics`, `useShiftHistory`, `useCurrentShift` |
+| 13 | **loading.tsx / error.tsx** por segmento | Frontend | ✅ Implementado | Dashboard, turnos, admin con spinners y error boundaries |
+| 14 | **POST /auth/logout** + clear cookies | Backend | ✅ Implementado | Limpia `AUTH_TOKEN_COOKIE` + `gk-auth` signal; frontend lo llama en logout |
+| 15 | **@CurrentOrganization()** decorator | Backend | ✅ Implementado | Extrae `organizationId` del JWT; lanza 401 si ausente |
 
 ---
 
@@ -36,18 +46,23 @@ Leyenda de prioridad:
 
 ### Backend (NestJS)
 
+- **Error handling refactor** — remover `try-catch` genérico de controllers (`auth.controller.ts`, `shift.controller.ts`, `admin.controller.ts`); dejar que excepciones tipadas (`NotFoundException`, `ConflictException`) se propaguen via `HttpExceptionFilter` ya global. Controllers más limpios, servicios responsables del contexto de error. Owner: `backend-developer`. Esfuerzo: M.
+- **Helmet CSP habilitado** — `contentSecurityPolicy: false` en `backend/src/main.ts` debe habilitarse con directivas explícitas (`defaultSrc: ["'self'"]`, etc.). Actualmente deshabilitado = riesgo real en producción. Owner: `devops-deployer`/`backend-developer`. Esfuerzo: S. **[P1 seguridad]**
+- **@nestjs/schedule** para auto-cierre de turnos colgados — cron a medianoche cierra turnos `ACTIVE` con `clockOutTime = NULL` que llevan > N horas; emite `SHIFT_AUTO_CLOSED` para auditoría. Implementa en `ShiftScheduleService`. Owner: `backend-developer`. Esfuerzo: M.
+- **Custom `@ValidateDtosPipe`** — `@UsePipes(new ValidationPipe({...}))` repetido idénticamente en `auth.controller.ts:45`, `shift.controller.ts:43`, `admin.controller.ts:64`. Centralizar con `APP_PIPE` global o decorator custom. Owner: `backend-developer`. Esfuerzo: S.
+- **Guards composability** — `AdminAuthGuard` inyecta y llama `jwtAuthGuard.canActivate()` manualmente. Refactorizar a `@UseGuards(JwtAuthGuard, AdminAuthGuard)` en controllers (NestJS ejecuta en secuencia). Owner: `backend-developer`. Esfuerzo: S.
+- **Validación con grupos** — usar class-validator `groups` para diferenciar reglas create vs update en `CreateUserAdminDto`/`UpdateUserAdminDto`. Owner: `backend-developer`. Esfuerzo: S.
+- **@ApiResponse Swagger completo** — auditar endpoints; varios retornan `any` en Swagger (`admin.controller.ts` `GET users/:id/with-roles`, analytics endpoints). Agregar tipos concretos con `@ApiResponse({ type: MyDto })`. Owner: `backend-developer`. Esfuerzo: M.
+- **Rate limiting en endpoints admin** — endpoints pesados como `GET /admin/shifts` y `GET /admin/users` sin `@Throttle()`. Agregar throttle group `admin: { limit: 100, ttl: 60000 }`. Owner: `backend-developer`. Esfuerzo: S.
 - **Server Actions / Type-safe RPC** — generar tipos del backend a partir del Swagger spec (`openapi-typescript`) y consumirlos en frontend; elimina drift manual.
-- **@nestjs/cache-manager** para roles/permisos por usuario — hot path leído en cada request autenticada.
-- **@nestjs/event-emitter** para efectos de dominio (`shift.completed`, `user.invited`) — desacopla notificaciones de la lógica de marcaje.
-- **@nestjs/schedule** para auto-cerrar turnos colgados (`active > N horas → completed automático` por política de organización).
-- **Helmet + CORS estricto desde env** — security headers por defecto, CORS lista blanca validada por Joi.
-- **Logger estructurado** (pino o nest-winston) — JSON en prod, request-id propagado.
 
 ### Frontend (Next.js)
 
+- **Server Components reales en dashboard** — dashboard sigue siendo `'use client'` (`frontend/src/app/dashboard/page.tsx:1`) porque depende de `AuthContext`. Convertir: leer usuario desde cookie en servidor (`cookies().get(AUTH_TOKEN_COOKIE)` + verify), fetch con `revalidate: 60`, pasar datos como props a subcomponentes client interactivos (`ClockInButton`, `ShiftList`). Owner: `frontend-developer`. Esfuerzo: L.
+- **`next/image`** para logos y avatares — reemplazar `<img>` con `Image` de `next/image`; optimización automática WebP, lazy loading, sizing hints. Esfuerzo: XS.
+- **`generateMetadata()` dinámico** — metadata estático en `layout.tsx` heredado por todas las páginas. Agregar `export async function generateMetadata()` en `/dashboard`, `/admin/*`, `/turnos`. Esfuerzo: XS.
+- **Logout revalidation con SSG** — si dashboard se convierte a Server Component, logout debe llamar `revalidatePath('/dashboard')`. Esfuerzo: S.
 - **Server Actions** en formularios de mutación (crear usuario, marcar turno, asignar rol) — reduce cliente bundle y mejora UX.
-- **Server Components reales en dashboard** — la migración parcial ya hecha (SWR + dedup + `loading.tsx`/`error.tsx` por segment) cubre la UX de streaming, pero el dashboard sigue siendo client component porque depende de `AuthContext`. Convertirlo a Server Component requiere reemplazar `AuthContext` por lectura del usuario desde la cookie `auth_token` en server side (`cookies().get('auth_token')` + verify), y trasladar `apiClient.get` a `fetch` con `revalidate: 60`. Owner: `frontend-developer`.
-- **`next/image`** para logos y avatares; activar `output: 'standalone'` en `next.config.ts` para imágenes Docker más pequeñas.
 - **Suspense boundary por sección** en `/admin` y `/dashboard`.
 
 ---
@@ -64,7 +79,7 @@ Leyenda de prioridad:
 ### Backend
 
 - **CQRS** (`@nestjs/cqrs`) para el agregado `shift` — la lectura (analytics, dashboard) es muchísimo mayor que la escritura (marcaje).
-- **Bull queue** (`@nestjs/bull`) para jobs pesados: export de reportes mensuales, emails de invitación, recálculo de analytics.
+- **@nestjs/bull (BullMQ)** para jobs pesados: export de reportes mensuales (CSV), emails de invitación, recálculo de analytics. `POST /admin/reports/export` → crea job + retorna `jobId`; frontend poll `GET /admin/jobs/{jobId}`. Requiere Redis. Esfuerzo: L.
 - **WebSockets** (`@nestjs/websockets`) para marcajes en vivo en dashboards de admin.
 - **API versioning** (`/api/v1`) — anticipa breaking changes futuros.
 - **Múltiples organizaciones por sesión activa** — hoy un JWT lleva una sola; usuarios con varias orgs deben elegir contexto.
