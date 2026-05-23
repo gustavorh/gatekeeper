@@ -77,21 +77,21 @@ frontend/src/
 
 ### Backend (`cd backend`)
 ```bash
-npm run start:dev           # dev con watch
-npm run build               # compile
-npm run lint                # eslint --fix
-npm run test                # unit
-npm run test:e2e            # integración
-npm run db:generate         # generar migración Drizzle
-npm run db:migrate          # aplicar migraciones
-npm run db:studio           # UI Drizzle
+pnpm start:dev           # dev con watch
+pnpm build               # compile
+pnpm lint                # eslint --fix
+pnpm test                # unit
+pnpm test:e2e            # integración
+pnpm db:generate         # generar migración Drizzle
+pnpm db:migrate          # aplicar migraciones
+pnpm db:studio           # UI Drizzle
 ```
 
 ### Frontend (`cd frontend`)
 ```bash
-npm run dev                 # next dev con turbopack
-npm run build
-npm run lint                # next lint
+pnpm dev                 # next dev con turbopack
+pnpm build
+pnpm lint                # next lint
 ```
 
 ### Docker
