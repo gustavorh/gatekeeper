@@ -33,6 +33,11 @@ import {
   PermissionResponseDto,
   UserListWithRolesResponse,
 } from '../../application/dto/admin.dto';
+import {
+  AckResponseDto,
+  DashboardDataDto,
+} from '../../application/dto/dashboard.dto';
+import { ShiftWithUserListResponseDto } from '../../application/dto/shift-admin.dto';
 import { ShiftFilters } from '../../domain/repositories/shift.repository.interface';
 import { ShiftStatus } from '../../domain/entities/shift.entity';
 import {
@@ -89,56 +94,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'Dashboard data retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: {
-          type: 'object',
-          properties: {
-            stats: {
-              type: 'object',
-              properties: {
-                totalUsers: { type: 'number' },
-                activeUsers: { type: 'number' },
-                totalShifts: { type: 'number' },
-                activeShifts: { type: 'number' },
-                totalRoles: { type: 'number' },
-                totalPermissions: { type: 'number' },
-              },
-            },
-            recentActivities: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  type: { type: 'string' },
-                  description: { type: 'string' },
-                  userId: { type: 'string' },
-                  userName: { type: 'string' },
-                  timestamp: { type: 'string' },
-                },
-              },
-            },
-            topUsers: {
-              type: 'array',
-              items: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  name: { type: 'string' },
-                  totalShifts: { type: 'number' },
-                  totalHours: { type: 'number' },
-                },
-              },
-            },
-          },
-        },
-        timestamp: { type: 'string' },
-      },
-    },
+    type: DashboardDataDto,
   })
   async getDashboardData() {
     try {
@@ -215,60 +171,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'Users retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        users: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              rut: { type: 'string' },
-              email: { type: 'string' },
-              firstName: { type: 'string' },
-              lastName: { type: 'string' },
-              isActive: { type: 'boolean' },
-              createdAt: { type: 'string', format: 'date-time' },
-              updatedAt: { type: 'string', format: 'date-time' },
-              roles: {
-                type: 'array',
-                items: {
-                  type: 'object',
-                  properties: {
-                    id: { type: 'string' },
-                    name: { type: 'string' },
-                    description: { type: 'string' },
-                    isActive: { type: 'boolean' },
-                    createdAt: { type: 'string', format: 'date-time' },
-                    updatedAt: { type: 'string', format: 'date-time' },
-                    permissions: {
-                      type: 'array',
-                      items: {
-                        type: 'object',
-                        properties: {
-                          id: { type: 'string' },
-                          name: { type: 'string' },
-                          description: { type: 'string' },
-                          resource: { type: 'string' },
-                          action: { type: 'string' },
-                          isActive: { type: 'boolean' },
-                          createdAt: { type: 'string', format: 'date-time' },
-                          updatedAt: { type: 'string', format: 'date-time' },
-                        },
-                      },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-        total: { type: 'number' },
-        page: { type: 'number' },
-        limit: { type: 'number' },
-      },
-    },
+    type: UserListWithRolesResponse,
   })
   async getUsers(
     @Query() paginationDto: PaginationDto,
@@ -355,16 +258,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'User deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: { type: 'null' },
-        timestamp: { type: 'string' },
-        endpoint: { type: 'string' },
-      },
-    },
+    type: AckResponseDto,
   })
   @ApiNotFoundResponse({ description: 'User not found' })
   async deleteUser(
@@ -528,16 +422,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'Role deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: { type: 'null' },
-        timestamp: { type: 'string' },
-        endpoint: { type: 'string' },
-      },
-    },
+    type: AckResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Role not found' })
   async deleteRole(
@@ -684,16 +569,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'Permission deleted successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        success: { type: 'boolean' },
-        message: { type: 'string' },
-        data: { type: 'null' },
-        timestamp: { type: 'string' },
-        endpoint: { type: 'string' },
-      },
-    },
+    type: AckResponseDto,
   })
   @ApiNotFoundResponse({ description: 'Permission not found' })
   async deletePermission(
@@ -734,39 +610,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'Active shifts retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        shifts: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              userId: { type: 'string' },
-              clockInTime: { type: 'string' },
-              clockOutTime: { type: 'string', nullable: true },
-              lunchStartTime: { type: 'string', nullable: true },
-              lunchEndTime: { type: 'string', nullable: true },
-              status: { type: 'string' },
-              createdAt: { type: 'string' },
-              updatedAt: { type: 'string' },
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  rut: { type: 'string' },
-                  firstName: { type: 'string' },
-                  lastName: { type: 'string' },
-                  email: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-        total: { type: 'number' },
-      },
-    },
+    type: ShiftWithUserListResponseDto,
   })
   async getActiveShifts(
     @Query('limit') limit?: number,
@@ -828,39 +672,7 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description: 'All shifts retrieved successfully',
-    schema: {
-      type: 'object',
-      properties: {
-        shifts: {
-          type: 'array',
-          items: {
-            type: 'object',
-            properties: {
-              id: { type: 'string' },
-              userId: { type: 'string' },
-              clockInTime: { type: 'string' },
-              clockOutTime: { type: 'string', nullable: true },
-              lunchStartTime: { type: 'string', nullable: true },
-              lunchEndTime: { type: 'string', nullable: true },
-              status: { type: 'string' },
-              createdAt: { type: 'string' },
-              updatedAt: { type: 'string' },
-              user: {
-                type: 'object',
-                properties: {
-                  id: { type: 'string' },
-                  rut: { type: 'string' },
-                  firstName: { type: 'string' },
-                  lastName: { type: 'string' },
-                  email: { type: 'string' },
-                },
-              },
-            },
-          },
-        },
-        total: { type: 'number' },
-      },
-    },
+    type: ShiftWithUserListResponseDto,
   })
   async getAllShifts(
     @Query('limit') limit?: number,
