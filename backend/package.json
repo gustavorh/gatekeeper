@@ -20,10 +20,11 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "test:unit": "jest --testPathPattern=src --testPathIgnorePatterns=src/main.ts",
     "test:integration": "jest --testPathPattern=test --testPathIgnorePatterns=test/setup.ts",
-    "test:all": "npm run test:unit && npm run test:integration && npm run test:e2e",
+    "test:all": "pnpm run test:unit && pnpm run test:integration && pnpm run test:e2e",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:seed": "ts-node --transpile-only src/seed.ts"
   },
   "dependencies": {
     "@nestjs/bullmq": "^11.0.4",

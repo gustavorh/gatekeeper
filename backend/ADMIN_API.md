@@ -573,5 +573,5 @@ The admin functionality includes comprehensive unit tests covering:
 Run tests with:
 
 ```bash
-npm run test admin.service.spec.ts
+pnpm run test admin.service.spec.ts
 ```

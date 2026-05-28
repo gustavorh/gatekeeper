@@ -54,37 +54,37 @@ backend/
 ### All Tests
 
 ```bash
-npm run test:all
+pnpm run test:all
 ```
 
 ### Unit Tests Only
 
 ```bash
-npm run test:unit
+pnpm run test:unit
 ```
 
 ### Integration Tests Only
 
 ```bash
-npm run test:integration
+pnpm run test:integration
 ```
 
 ### End-to-End Tests Only
 
 ```bash
-npm run test:e2e
+pnpm run test:e2e
 ```
 
 ### Watch Mode
 
 ```bash
-npm run test:watch
+pnpm run test:watch
 ```
 
 ### Coverage Report
 
 ```bash
-npm run test:cov
+pnpm run test:cov
 ```
 
 ## Test Configuration
@@ -308,13 +308,13 @@ The testing setup is designed to work with CI/CD pipelines:
 ```yaml
 # Example CI configuration
 - name: Run unit tests
-  run: npm run test:unit
+  run: pnpm run test:unit
 
 - name: Run integration tests
-  run: npm run test:integration
+  run: pnpm run test:integration
 
 - name: Generate coverage report
-  run: npm run test:cov
+  run: pnpm run test:cov
 ```
 
 ## Debugging Tests
@@ -322,19 +322,19 @@ The testing setup is designed to work with CI/CD pipelines:
 ### Debug Mode
 
 ```bash
-npm run test:debug
+pnpm run test:debug
 ```
 
 ### Watch Mode with Coverage
 
 ```bash
-npm run test:watch -- --coverage
+pnpm run test:watch -- --coverage
 ```
 
 ### Specific Test File
 
 ```bash
-npm test -- auth.service.spec.ts
+pnpm test -- auth.service.spec.ts
 ```
 
 ## Test Maintenance

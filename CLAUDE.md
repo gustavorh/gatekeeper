@@ -18,13 +18,15 @@ Roadmap técnico priorizado: [`docs/architecture/optimization-roadmap.md`](./doc
 
 ## Arquitectura del repo
 
-Monorepo lógico (carpetas independientes, **no** workspaces npm):
+Monorepo **pnpm workspace** (gestionado por Corepack, versión pineada en `package.json` raíz):
 
 ```
 backend/   # NestJS 11 + Drizzle + MySQL (puerto 9000 por defecto)
 frontend/  # Next.js 15 App Router + React 19 + Tailwind v4 (puerto 8000)
 docs/      # Documentación de producto y arquitectura
 ```
+
+Instalación única desde la raíz: `pnpm install`. Lockfile único: `/pnpm-lock.yaml`. Para ejecutar un script de un paquete específico desde cualquier ubicación: `pnpm --filter ./backend <script>` (o `./frontend`). La raíz expone aliases (`pnpm dev:backend`, `pnpm dev:frontend`, `pnpm build`, `pnpm lint`, `pnpm db:migrate`, etc.).
 
 Backend y frontend se comunican por **REST**. El frontend usa `ApiClient` (`frontend/src/lib/api.ts`) y guarda el JWT en `localStorage`.
 
@@ -85,6 +87,7 @@ pnpm test:e2e            # integración
 pnpm db:generate         # generar migración Drizzle
 pnpm db:migrate          # aplicar migraciones
 pnpm db:studio           # UI Drizzle
+pnpm db:seed             # seed inicial (roles, permisos, admin user)
 ```
 
 ### Frontend (`cd frontend`)

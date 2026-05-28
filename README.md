@@ -11,19 +11,33 @@ Monorepo del producto **Gatekeeper** (control de asistencia B2B, multi-organizac
 
 ## Desarrollo
 
-Cada proyecto tiene sus propias dependencias y scripts. Trabaja en cada directorio según el componente que necesites modificar:
+Monorepo **pnpm workspace**. Instala todo desde la raíz una sola vez:
 
 ```bash
-# Backend
-cd backend
-npm install
-npm run dev
-
-# Frontend
-cd frontend
-npm install
-npm run dev
+pnpm install
 ```
+
+Comandos raíz (delegan al paquete correspondiente):
+
+```bash
+pnpm dev:backend          # Nest en watch mode
+pnpm dev:frontend         # Next dev con turbopack
+pnpm build                # compila ambos paquetes
+pnpm lint                 # lint en ambos paquetes
+pnpm test:backend         # tests unitarios del backend
+pnpm db:generate          # generar migración Drizzle
+pnpm db:migrate           # aplicar migraciones
+pnpm db:seed              # primer levantamiento: roles, permisos, admin user
+```
+
+También puedes trabajar dentro de cada paquete usando filtros:
+
+```bash
+pnpm --filter ./backend <script>
+pnpm --filter ./frontend <script>
+```
+
+Requisitos: Node ≥ 20. La versión de pnpm está pineada en `packageManager` y se gestiona vía [Corepack](https://nodejs.org/api/corepack.html).
 
 ## Documentación de producto
 

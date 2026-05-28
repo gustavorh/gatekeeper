@@ -187,27 +187,27 @@ src/
 
 ### Desarrollo
 
-- `npm run start:dev`: Servidor en modo desarrollo con hot reload
-- `npm run start:debug`: Servidor en modo debug
-- `npm run build`: Compilación del proyecto
+- `pnpm run start:dev`: Servidor en modo desarrollo con hot reload
+- `pnpm run start:debug`: Servidor en modo debug
+- `pnpm run build`: Compilación del proyecto
 
 ### Base de Datos
 
-- `npm run db:generate`: Generar migraciones
-- `npm run db:migrate`: Ejecutar migraciones
-- `npm run db:studio`: Abrir Drizzle Studio
+- `pnpm run db:generate`: Generar migraciones
+- `pnpm run db:migrate`: Ejecutar migraciones
+- `pnpm run db:studio`: Abrir Drizzle Studio
 
 ### Testing
 
-- `npm run test`: Tests unitarios
-- `npm run test:watch`: Tests en modo watch
-- `npm run test:e2e`: Tests end-to-end
-- `npm run test:cov`: Tests con cobertura
+- `pnpm run test`: Tests unitarios
+- `pnpm run test:watch`: Tests en modo watch
+- `pnpm run test:e2e`: Tests end-to-end
+- `pnpm run test:cov`: Tests con cobertura
 
 ### Calidad de Código
 
-- `npm run lint`: Linting y corrección automática
-- `npm run format`: Formateo de código con Prettier
+- `pnpm run lint`: Linting y corrección automática
+- `pnpm run format`: Formateo de código con Prettier
 
 ## Configuración del Proyecto
 

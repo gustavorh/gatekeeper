@@ -71,7 +71,7 @@ Leyenda de prioridad:
 
 ### Arquitectura
 
-- **Monorepo formal** con `npm workspaces` (o `pnpm`) y paquete `@gatekeeper/types` compartido — elimina duplicación de tipos entre back y front.
+- **Paquete `@gatekeeper/types` compartido** sobre el workspace pnpm existente — elimina duplicación de tipos entre back y front. (Workspace pnpm ya migrado; falta extraer los tipos compartidos.)
 - **docker-compose.yml raíz** — `mysql + backend + frontend + adminer` para dev local en un comando.
 - **CI/CD** GitHub Actions: lint + test + build en PR; deploy en merge a `main` (target a definir).
 - **Postgres + Row-Level Security** — migrar desde MySQL para forzar multi-tenancy a nivel DB; eliminar la posibilidad de bug en repo que olvide filtrar por `organizationId`.

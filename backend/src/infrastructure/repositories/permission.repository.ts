@@ -1,5 +1,5 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { eq } from 'drizzle-orm';
+import { eq, inArray } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
 import {
@@ -109,7 +109,7 @@ export class PermissionRepository implements IPermissionRepository {
     const permissionsResult = await this.db
       .select()
       .from(permissions)
-      .where(eq(permissions.id, permissionIds));
+      .where(inArray(permissions.id, permissionIds));
 
     return permissionsResult;
   }

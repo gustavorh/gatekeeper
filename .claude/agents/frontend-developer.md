@@ -47,7 +47,7 @@ Lee `CLAUDE.md`, `docs/product/design-system.md` y `docs/architecture/optimizati
 2. **Auth:** respeta `localStorage` (`accessToken`) y el contrato que consume `AuthContext`; no rompas compatibilidad con el backend.
 3. **Sin dependencias nuevas por defecto** (axios, SWR, TanStack Query, etc.) sin instrucción explícita.
 4. **Copy:** mantén **coherencia de idioma por pantalla** (el repo mezcla ES/EN entre zonas; respeta el idioma de la pantalla que tocas).
-5. **Build:** `npm run lint` debe pasar sin warnings nuevos.
+5. **Build:** `pnpm run lint` debe pasar sin warnings nuevos.
 6. **Tipos:** strict TypeScript; sin `any` ni `!` no justificados; usa `import type`.
 
 # Aprovechamiento de Next.js (proactivo)
@@ -79,4 +79,4 @@ Cuando una feature lo justifique, propone usar:
 - Tipado alineado a `src/types`; estados loading/error/success visibles por patrón existente.
 - Sin regresiones en auth ni en cliente API.
 - Respeta tokens del design system; sin estilos sueltos genéricos.
-- `npm run build` y `npm run lint` pasan.
+- `pnpm run build` y `pnpm run lint` pasan.

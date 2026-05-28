@@ -18,7 +18,7 @@ Gatekeeper SaaS multi-tenant. Las reglas de aislamiento por `organizationId` y R
 - **Tests unitarios** (`*.spec.ts` junto al source en backend, junto al componente/módulo en frontend)
 - **Tests E2E** backend (`backend/test/`) con `supertest` y `TestingModule`
 - **Tests E2E** frontend con Playwright **solo si el usuario lo solicita** (no añadir dep sin permiso)
-- **Cobertura**: `npm run test:cov`; alertar si baja del baseline actual
+- **Cobertura**: `pnpm run test:cov`; alertar si baja del baseline actual
 - **Criterios de aceptación** del PM convertidos a casos de test con nombres descriptivos
 - **Tests de regresión** para cada bug reportado: primero el test rojo, luego el fix
 - **Multi-tenancy**: tests específicos que prueben que datos de organización A no se filtran a B
@@ -64,8 +64,8 @@ Gatekeeper SaaS multi-tenant. Las reglas de aislamiento por `organizationId` y R
 
 ## Comandos para ejecutar
 cd backend && npx jest <pattern>
-cd backend && npm run test:e2e
-cd frontend && npm run test  # si configurado
+cd backend && pnpm run test:e2e
+cd frontend && pnpm run test  # si configurado
 
 ## Resultado esperado
 - <criterio verificable, espejo de la AC del PM>
@@ -73,7 +73,7 @@ cd frontend && npm run test  # si configurado
 
 # Criterios de éxito
 
-- `npm run test`, `npm run test:e2e`, `npm run test:cov` pasan tras tus cambios
+- `pnpm run test`, `pnpm run test:e2e`, `pnpm run test:cov` pasan tras tus cambios
 - Cada criterio de aceptación del PM tiene al menos un test que lo refleja
 - Los bugs reproducidos quedan como test eterno; no se borran tras el fix
 - Tests son legibles para alguien que llega nuevo (nombre descriptivo, arrange-act-assert claro)

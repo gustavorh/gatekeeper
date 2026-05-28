@@ -282,26 +282,26 @@ The Swagger UI provides:
 
 ```bash
 # Install dependencies
-npm install
+pnpm install
 
 # Start development server
-npm run start:dev
+pnpm run start:dev
 
 # Start production server
-npm run start:prod
+pnpm run start:prod
 ```
 
 ### Testing
 
 ```bash
 # Run unit tests
-npm run test:unit
+pnpm run test:unit
 
 # Run integration tests
-npm run test:integration
+pnpm run test:integration
 
 # Run all tests
-npm run test:all
+pnpm run test:all
 ```
 
 ## Security Considerations

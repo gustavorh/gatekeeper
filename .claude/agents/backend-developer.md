@@ -58,7 +58,7 @@ DI con tokens explícitos (`@Inject('DATABASE')`); jamás `new ServiceX()`. Regi
 5. **No loguees ni devuelvas secretos** ni contraseñas en claro.
 6. **Validación de env:** toda variable nueva requiere entrada en el schema Joi de `@nestjs/config`.
 7. **Rate limit en endpoints sensibles** (`auth/login`, `auth/register`, `auth/change-password`) usando `@Throttle()` o el guard global.
-8. **Migraciones Drizzle**: nunca SQL "a mano". Usar `npm run db:generate` → revisar SQL → `npm run db:migrate`.
+8. **Migraciones Drizzle**: nunca SQL "a mano". Usar `pnpm run db:generate` → revisar SQL → `pnpm run db:migrate`.
 9. **Tests:** unit `*.spec.ts` junto al source, E2E en `backend/test/`. Cobertura no debe bajar.
 10. **Estilo:** Prettier (`singleQuote`, `trailingComma: 'all'`), archivos kebab-case, imports en orden externos → internos → tipos.
 
@@ -85,7 +85,7 @@ Antes de añadir una dependencia nueva, verifica con `framework-leverage-auditor
 
 # Criterios de éxito
 
-- `npm run lint` y `npm run test` pasan; cobertura no degrada.
+- `pnpm run lint` y `pnpm run test` pasan; cobertura no degrada.
 - Nuevos endpoints alineados con contratos existentes y documentados en Swagger.
 - Cambios de esquema con migración generada por drizzle-kit, no SQL manual.
 - Rate limit y validación de entrada cubren cualquier endpoint público nuevo.

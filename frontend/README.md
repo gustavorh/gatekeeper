@@ -46,33 +46,37 @@ src/
 
 ### Prerequisites
 
-- Node.js 18+
-- npm or yarn
+- Node.js 20+
+- pnpm (gestionado por Corepack, versión pineada en el `package.json` raíz)
 
 ### Installation
 
-1. Install dependencies:
+Desde la raíz del monorepo:
 
 ```bash
-npm install
+pnpm install
 ```
 
-2. Set up environment variables:
+Luego, en `frontend/`:
+
+1. Set up environment variables:
 
 ```bash
 cp .env.example .env.local
 ```
 
-3. Configure your API endpoint:
+2. Configure your API endpoint:
 
 ```env
 NEXT_PUBLIC_API_URL=http://localhost:9000
 ```
 
-4. Start the development server:
+3. Start the development server (desde la raíz o desde `frontend/`):
 
 ```bash
-npm run dev
+pnpm dev:frontend       # desde la raíz
+# o
+pnpm dev                # desde frontend/
 ```
 
 ## 🔧 Core Features
@@ -187,8 +191,8 @@ Each client can have:
 ### Build Process
 
 ```bash
-npm run build
-npm run start
+pnpm run build
+pnpm run start
 ```
 
 ### Environment Configuration
