@@ -4,6 +4,7 @@ import {
   ExecutionContext,
   UnauthorizedException,
   Inject,
+  Logger,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
@@ -13,8 +14,16 @@ import {
   AUTH_TOKEN_COOKIE_FALLBACK,
 } from '../../application/constants/auth-cookies';
 
+// jsonwebtoken error names — checked by name to avoid a direct import of
+// the package which is a transitive (non-hoisted) dependency of @nestjs/jwt.
+const JWT_ERROR_TOKEN_EXPIRED = 'TokenExpiredError';
+const JWT_ERROR_INVALID = 'JsonWebTokenError';
+const JWT_ERROR_NOT_BEFORE = 'NotBeforeError';
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(
     private jwtService: JwtService,
     @Inject('IUserRepository')
@@ -26,14 +35,16 @@ export class JwtAuthGuard implements CanActivate {
     const token = this.extractTokenFromHeader(request);
 
     if (!token) {
-      throw new UnauthorizedException();
+      throw new UnauthorizedException('No authentication token provided');
     }
 
+    let payload: { sub?: string; organizationId?: string } | undefined;
+
     try {
-      const payload = await this.jwtService.verifyAsync(token);
+      payload = await this.jwtService.verifyAsync(token);
 
       // Obtener el usuario completo desde la base de datos
-      const user = await this.userRepository.findById(payload.sub);
+      const user = await this.userRepository.findById(payload.sub ?? '');
 
       if (!user || !user.isActive) {
         throw new UnauthorizedException('User not found or inactive');
@@ -48,8 +59,26 @@ export class JwtAuthGuard implements CanActivate {
         ...user,
         organizationId,
       };
-    } catch {
-      throw new UnauthorizedException();
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      const errName = (error as { name?: string })?.name;
+      const errMessage = (error as { message?: string })?.message ?? '';
+      if (errName === JWT_ERROR_TOKEN_EXPIRED) {
+        this.logger.warn({ msg: 'JWT expired', userId: payload?.sub });
+        throw new UnauthorizedException('Token expired');
+      }
+      if (errName === JWT_ERROR_NOT_BEFORE) {
+        this.logger.warn({ msg: 'JWT not yet valid' });
+        throw new UnauthorizedException('Token not yet valid');
+      }
+      if (errName === JWT_ERROR_INVALID) {
+        this.logger.warn({ msg: 'Invalid JWT', error: errMessage });
+        throw new UnauthorizedException('Invalid token');
+      }
+      this.logger.error({ msg: 'Unexpected JWT validation error', error });
+      throw new UnauthorizedException('Authentication failed');
     }
 
     return true;
