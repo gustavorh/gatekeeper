@@ -1,10 +1,10 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { AdminService } from './admin.service';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface';
-import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
-import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IRoleRepository } from '../../domain/repositories/role.repository.interface';
+import type { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
+import { CACHE_SERVICE } from '../interfaces/cache.service.interface';
 import {
   CreateUserAdminDto,
   CreateRoleAdminDto,
@@ -21,7 +21,6 @@ describe('AdminService', () => {
     id: 'user-1',
     rut: '123456785',
     email: 'test@example.com',
-    password: 'hashed-password',
     firstName: 'John',
     lastName: 'Doe',
     isActive: true,
@@ -50,6 +49,12 @@ describe('AdminService', () => {
     transaction: jest.fn().mockImplementation(
       async (cb: (tx: typeof mockTx) => Promise<unknown>) => cb(mockTx),
     ),
+    // getDashboardData uses direct db.select chains
+    select: jest.fn().mockReturnValue({
+      from: jest.fn().mockReturnValue({
+        where: jest.fn().mockResolvedValue([{ count: 0 }]),
+      }),
+    }),
   };
 
   const mockCache = {
@@ -64,9 +69,15 @@ describe('AdminService', () => {
       findById: jest.fn(),
       findByRut: jest.fn(),
       findByEmail: jest.fn(),
+      findByEmailWithPassword: jest.fn(),
+      findByRutWithPassword: jest.fn(),
       findAll: jest.fn(),
+      findAllRaw: jest.fn(),
+      findByIdWithRolesAndPermissions: jest.fn(),
       update: jest.fn(),
       delete: jest.fn(),
+      existsByRut: jest.fn(),
+      existsByEmail: jest.fn(),
     };
 
     const mockRoleRepository: Partial<jest.Mocked<IRoleRepository>> = {
@@ -78,6 +89,7 @@ describe('AdminService', () => {
       delete: jest.fn(),
       assignRoleToUser: jest.fn(),
       findUserRoles: jest.fn(),
+      findUserRolesBatch: jest.fn(),
       removeRoleFromUser: jest.fn(),
       removeAllUserRoles: jest.fn(),
     };
@@ -120,7 +132,7 @@ describe('AdminService', () => {
           useValue: mockPermissionRepository,
         },
         {
-          provide: CACHE_MANAGER,
+          provide: CACHE_SERVICE,
           useValue: mockCache,
         },
         {

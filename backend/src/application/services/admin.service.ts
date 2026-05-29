@@ -6,14 +6,15 @@ import {
   NotFoundException,
   Logger,
 } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
 import { v4 as uuidv4 } from 'uuid';
 import * as bcrypt from 'bcryptjs';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface';
-import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
-import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
+import { eq, count, gte } from 'drizzle-orm';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IRoleRepository } from '../../domain/repositories/role.repository.interface';
+import type { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
+import type { ICacheService } from '../interfaces/cache.service.interface';
+import { CACHE_SERVICE } from '../interfaces/cache.service.interface';
 import { User, UpdateUserDto } from '../../domain/entities/user.entity';
 import { Role, UpdateRoleDto } from '../../domain/entities/role.entity';
 import {
@@ -33,13 +34,15 @@ import {
   PermissionListResponse,
   UserListWithRolesResponse,
 } from '../dto/admin.dto';
-import { eq } from 'drizzle-orm';
-import {
-  users as usersTable,
-  roles as rolesTable,
+import * as schema from '../../infrastructure/database/schema';
+
+const {
+  users: usersTable,
+  roles: rolesTable,
   rolePermissions,
-  userRoles as userRolesTable,
-} from '../../infrastructure/database/schema';
+  userRoles: userRolesTable,
+  shifts: shiftsTable,
+} = schema;
 
 @Injectable()
 export class AdminService {
@@ -52,10 +55,10 @@ export class AdminService {
     private readonly roleRepository: IRoleRepository,
     @Inject('IPermissionRepository')
     private readonly permissionRepository: IPermissionRepository,
-    @Inject(CACHE_MANAGER)
-    private readonly cache: Cache,
+    @Inject(CACHE_SERVICE)
+    private readonly cache: ICacheService,
     @Inject('DATABASE')
-    private readonly db: MySql2Database,
+    private readonly db: MySql2Database<typeof schema>,
   ) {}
 
   private async invalidateUserCache(userId: string): Promise<void> {
@@ -149,55 +152,68 @@ export class AdminService {
     paginationDto: PaginationDto,
   ): Promise<UserListWithRolesResponse> {
     const { page = 1, limit = 10, search } = paginationDto;
-    const offset = (page - 1) * limit;
 
-    // For now, we'll get all users and filter in memory
-    // In a real implementation, you'd want to implement pagination in the repository
-    const allUsers = await this.userRepository.findAll();
-
-    let filteredUsers = allUsers;
-
+    // P1-2 + C4: SQL-level pagination with isActive filter
+    // Search still needs in-memory filter until full-text index is added
     if (search) {
-      filteredUsers = allUsers.filter(
+      // With a search term, fetch active users without SQL pagination first
+      // (search across text fields; acceptable for small-to-medium datasets)
+      const allActive = await this.userRepository.findAllRaw({ onlyActive: true });
+      const filtered = allActive.filter(
         (user) =>
           user.firstName.toLowerCase().includes(search.toLowerCase()) ||
           user.lastName.toLowerCase().includes(search.toLowerCase()) ||
           user.email.toLowerCase().includes(search.toLowerCase()) ||
           user.rut.includes(search),
       );
+      const total = filtered.length;
+      const offset = (page - 1) * limit;
+      const paginatedUsers = filtered.slice(offset, offset + limit);
+
+      return this._attachRolesToUsers(paginatedUsers, total, page, limit);
     }
 
-    const total = filteredUsers.length;
-    const paginatedUsers = filteredUsers.slice(offset, offset + limit);
+    // No search: fully SQL-paginated
+    const { data: paginatedUsers, total } = await this.userRepository.findAll({
+      page,
+      limit,
+      onlyActive: true,
+    });
 
-    // Get users with their roles and permissions
+    return this._attachRolesToUsers(paginatedUsers, total, page, limit);
+  }
+
+  /** C5: batch-load roles for all users in one query, then attach permissions. */
+  private async _attachRolesToUsers(
+    users: User[],
+    total: number,
+    page: number,
+    limit: number,
+  ): Promise<UserListWithRolesResponse> {
+    if (users.length === 0) return { users: [], total, page, limit };
+
+    const userIds = users.map((u) => u.id);
+
+    // C5: single batch query for all roles
+    const rolesMap = await this.roleRepository.findUserRolesBatch(userIds);
+
+    // For each role, fetch permissions (still one query per role — acceptable
+    // since role count is small and bounded; full JOIN optimization tracked as A5)
     const usersWithRoles = await Promise.all(
-      paginatedUsers.map(async (user) => {
-        const userRoles = await this.roleRepository.findUserRoles(user.id);
+      users.map(async (user) => {
+        const userRoles = rolesMap.get(user.id) ?? [];
         const rolesWithPermissions = await Promise.all(
           userRoles.map(async (role) => {
             const permissions =
               await this.permissionRepository.findPermissionsByRole(role.id);
-            return {
-              ...role,
-              permissions,
-            };
+            return { ...role, permissions };
           }),
         );
-
-        return {
-          ...user,
-          roles: rolesWithPermissions,
-        };
+        return { ...user, roles: rolesWithPermissions };
       }),
     );
 
-    return {
-      users: usersWithRoles,
-      total,
-      page,
-      limit,
-    };
+    return { users: usersWithRoles, total, page, limit };
   }
 
   async getUserById(id: string): Promise<User> {
@@ -531,28 +547,41 @@ export class AdminService {
   }
 
   // Additional admin operations
-  async getUserWithRoles(userId: string): Promise<any> {
-    const user = await this.userRepository.findById(userId);
-    if (!user) {
+  // C5: single JOIN query replaces N+1
+  async getUserWithRoles(userId: string): Promise<{
+    id: string;
+    rut: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+    roles: Array<{
+      id: string;
+      name: string;
+      description: string;
+      isActive: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+      permissions: Array<{
+        id: string;
+        name: string;
+        description: string;
+        resource: string;
+        action: string;
+        isActive: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+      }>;
+    }>;
+  }> {
+    const result =
+      await this.userRepository.findByIdWithRolesAndPermissions(userId);
+    if (!result) {
       throw new NotFoundException('User not found');
     }
-
-    const userRoles = await this.roleRepository.findUserRoles(userId);
-    const rolesWithPermissions = await Promise.all(
-      userRoles.map(async (role) => {
-        const permissions =
-          await this.permissionRepository.findPermissionsByRole(role.id);
-        return {
-          ...role,
-          permissions,
-        };
-      }),
-    );
-
-    return {
-      ...user,
-      roles: rolesWithPermissions,
-    };
+    return { ...result.user, roles: result.roles };
   }
 
   async getRoleWithPermissions(roleId: string): Promise<any> {
@@ -569,81 +598,47 @@ export class AdminService {
     };
   }
 
-  // Dashboard Data
+  // Dashboard Data — D2: real queries replacing mock data
   async getDashboardData() {
-    try {
-      // Get basic statistics
-      const allUsers = await this.userRepository.findAll();
-      const allRoles = await this.roleRepository.findAll();
-      const allPermissions = await this.permissionRepository.findAll();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-      // Calculate active users (users with recent activity - simplified for now)
-      const activeUsers = allUsers.filter((user) => user.isActive).length;
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - today.getDay());
 
-      // For now, we'll return mock data for shifts since we don't have shift repository
-      // In a real implementation, you'd inject the shift repository
-      const totalShifts = 0; // Mock data
-      const activeShifts = 0; // Mock data
+    // KPI 1: total active users
+    const [totalUsersResult] = await this.db
+      .select({ count: count() })
+      .from(usersTable)
+      .where(eq(usersTable.isActive, true));
+    const totalUsers = Number(totalUsersResult.count);
 
-      // Mock recent activities
-      const recentActivities = [
-        {
-          id: '1',
-          type: 'user_created',
-          description: 'Nuevo usuario registrado',
-          userId: '1',
-          userName: 'Usuario Ejemplo',
-          timestamp: new Date().toISOString(),
-        },
-        {
-          id: '2',
-          type: 'shift_created',
-          description: 'Nuevo turno iniciado',
-          userId: '1',
-          userName: 'Usuario Ejemplo',
-          timestamp: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-        },
-      ];
+    // KPI 2: active shifts right now
+    const [activeShiftsResult] = await this.db
+      .select({ count: count() })
+      .from(shiftsTable)
+      .where(eq(shiftsTable.status, 'active'));
+    const activeShifts = Number(activeShiftsResult.count);
 
-      // Mock top users
-      const topUsers = [
-        {
-          id: '1',
-          name: 'Usuario Ejemplo',
-          totalShifts: 15,
-          totalHours: 120.5,
-        },
-        {
-          id: '2',
-          name: 'Otro Usuario',
-          totalShifts: 12,
-          totalHours: 96.0,
-        },
-      ];
+    // KPI 3: shifts that clocked in today
+    const [todayClockInsResult] = await this.db
+      .select({ count: count() })
+      .from(shiftsTable)
+      .where(gte(shiftsTable.clockInTime, today));
+    const todayClockIns = Number(todayClockInsResult.count);
 
-      return {
-        success: true,
-        message: 'Dashboard data retrieved successfully',
-        data: {
-          stats: {
-            totalUsers: allUsers.length,
-            activeUsers,
-            totalShifts,
-            activeShifts,
-            totalRoles: allRoles.length,
-            totalPermissions: allPermissions.length,
-          },
-          recentActivities,
-          topUsers,
-        },
-        timestamp: new Date().toISOString(),
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      throw new BadRequestException({
-        message: 'Failed to retrieve dashboard data',
-        error: message,
-      });
-    }
+    // KPI 4: total roles and permissions counts
+    const allRoles = await this.roleRepository.findAll();
+    const allPermissions = await this.permissionRepository.findAll();
+
+    return {
+      stats: {
+        totalUsers,
+        activeShifts,
+        todayClockIns,
+        totalRoles: allRoles.length,
+        totalPermissions: allPermissions.length,
+      },
+    };
   }
 }
