@@ -2,12 +2,14 @@ import {
   Injectable,
   Inject,
   BadRequestException,
+  ConflictException,
   NotFoundException,
   Logger,
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 import { v4 as uuidv4 } from 'uuid';
+import * as bcrypt from 'bcryptjs';
 import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
@@ -31,11 +33,12 @@ import {
   PermissionListResponse,
   UserListWithRolesResponse,
 } from '../dto/admin.dto';
-import { AuthService } from './auth.service';
-import { RegisterDto } from '../dto/auth.dto';
+import { eq } from 'drizzle-orm';
 import {
+  users as usersTable,
   roles as rolesTable,
   rolePermissions,
+  userRoles as userRolesTable,
 } from '../../infrastructure/database/schema';
 
 @Injectable()
@@ -49,7 +52,6 @@ export class AdminService {
     private readonly roleRepository: IRoleRepository,
     @Inject('IPermissionRepository')
     private readonly permissionRepository: IPermissionRepository,
-    private readonly authService: AuthService,
     @Inject(CACHE_MANAGER)
     private readonly cache: Cache,
     @Inject('DATABASE')
@@ -62,45 +64,85 @@ export class AdminService {
 
   // User Management
   async createUser(createUserDto: CreateUserAdminDto): Promise<User> {
-    // Extract RegisterDto fields for auth service
-    const registerData: RegisterDto = {
-      rut: createUserDto.rut,
-      email: createUserDto.email,
-      password: createUserDto.password,
-      firstName: createUserDto.firstName,
-      lastName: createUserDto.lastName,
-    };
-
-    // Use auth service to create user (this handles password hashing and validation)
-    const authResponse = await this.authService.register(registerData);
-
-    // Get the full user object from repository (including password field)
-    const user = await this.userRepository.findById(authResponse.user.id);
-    if (!user) {
-      throw new NotFoundException('User not found after creation');
+    // Pre-flight uniqueness checks outside transaction to give clear error messages
+    const existingByRut = await this.userRepository.findByRut(
+      createUserDto.rut,
+    );
+    if (existingByRut) {
+      throw new ConflictException('User with this RUT already exists');
     }
 
-    // Get the "user" role to check if it's already assigned
-    const userRole = await this.roleRepository.findByName('user');
-    if (!userRole) {
+    const existingByEmail = await this.userRepository.findByEmail(
+      createUserDto.email,
+    );
+    if (existingByEmail) {
+      throw new ConflictException('User with this email already exists');
+    }
+
+    // Validate that the default "user" role exists before opening transaction
+    const defaultRole = await this.roleRepository.findByName('user');
+    if (!defaultRole) {
       throw new NotFoundException('Default "user" role not found');
     }
 
-    // Get current user roles to check for duplicates
-    const currentUserRoles = await this.roleRepository.findUserRoles(user.id);
-    const currentRoleIds = currentUserRoles.map((role) => role.id);
-
-    // Assign additional roles if provided, avoiding duplicates
+    // Validate additional role IDs before opening transaction
+    const additionalRoleIds: string[] = [];
     if (createUserDto.roleIds && createUserDto.roleIds.length > 0) {
       for (const roleId of createUserDto.roleIds) {
-        // Skip if the role is already assigned (including the default "user" role)
-        if (!currentRoleIds.includes(roleId)) {
-          await this.roleRepository.assignRoleToUser(user.id, roleId);
+        const role = await this.roleRepository.findById(roleId);
+        if (!role) {
+          throw new BadRequestException(
+            `Role with id "${roleId}" does not exist`,
+          );
         }
+        additionalRoleIds.push(roleId);
       }
     }
 
-    return user;
+    const hashedPassword = await bcrypt.hash(createUserDto.password, 10);
+
+    return this.db.transaction(async (tx) => {
+      // Insert user
+      const userId = uuidv4();
+      await tx.insert(usersTable).values({
+        id: userId,
+        rut: createUserDto.rut,
+        email: createUserDto.email,
+        password: hashedPassword,
+        firstName: createUserDto.firstName,
+        lastName: createUserDto.lastName,
+      });
+
+      // Assign default "user" role
+      await tx.insert(userRolesTable).values({
+        id: uuidv4(),
+        userId,
+        roleId: defaultRole.id,
+      });
+
+      // Assign any additional roles (skip default if duplicated)
+      for (const roleId of additionalRoleIds) {
+        if (roleId !== defaultRole.id) {
+          await tx.insert(userRolesTable).values({
+            id: uuidv4(),
+            userId,
+            roleId,
+          });
+        }
+      }
+
+      // Read back the created user
+      const [newUser] = await tx
+        .select()
+        .from(usersTable)
+        .where(eq(usersTable.id, userId));
+
+      if (!newUser) {
+        throw new BadRequestException('User creation failed unexpectedly');
+      }
+
+      return newUser;
+    });
   }
 
   async getUsers(

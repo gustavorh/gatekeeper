@@ -5,6 +5,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
+import { eq, and } from 'drizzle-orm';
+import { v4 as uuidv4 } from 'uuid';
 import { IShiftService } from '../../domain/services/shift.service.interface';
 import { IShiftRepository } from '../../domain/repositories/shift.repository.interface';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
@@ -20,6 +23,7 @@ import {
   ShiftClockedOutEvent,
   ShiftCompletedEvent,
 } from '../../domain/events/shift.events';
+import { shifts } from '../../infrastructure/database/schema';
 
 @Injectable()
 export class ShiftService implements IShiftService {
@@ -29,30 +33,58 @@ export class ShiftService implements IShiftService {
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
     private readonly eventEmitter: EventEmitter2,
+    @Inject('DATABASE')
+    private readonly db: MySql2Database,
   ) {}
 
   async clockIn(userId: string): Promise<Shift> {
-    // Validate that user exists and is active
+    // Validate that user exists and is active (before opening transaction)
     const user = await this.userRepository.findById(userId);
     if (!user || !user.isActive) {
       throw new NotFoundException('User not found or inactive');
     }
 
-    // Check if user can clock in (no active or pending shifts)
-    const canClockIn = await this.validateClockIn(userId);
-    if (!canClockIn) {
-      throw new BadRequestException('User has an active or pending shift');
-    }
+    const updatedShift = await this.db.transaction(async (tx) => {
+      // Within transaction: verify no active or pending shift exists
+      const [existingActive] = await tx
+        .select()
+        .from(shifts)
+        .where(
+          and(eq(shifts.userId, userId), eq(shifts.status, ShiftStatus.ACTIVE)),
+        );
+      if (existingActive) {
+        throw new BadRequestException('User has an active shift');
+      }
 
-    // Create new shift
-    const shift = await this.shiftRepository.create({
-      userId,
-      clockInTime: new Date(),
-    });
+      const [existingPending] = await tx
+        .select()
+        .from(shifts)
+        .where(
+          and(
+            eq(shifts.userId, userId),
+            eq(shifts.status, ShiftStatus.PENDING),
+          ),
+        );
+      if (existingPending) {
+        throw new BadRequestException('User has a pending shift');
+      }
 
-    // Update shift status to active
-    const updatedShift = await this.shiftRepository.update(shift.id, {
-      status: ShiftStatus.ACTIVE,
+      // Insert new shift directly as ACTIVE (atomic create + activate)
+      const shiftId = uuidv4();
+      const now = new Date();
+      await tx.insert(shifts).values({
+        id: shiftId,
+        userId,
+        clockInTime: now,
+        status: ShiftStatus.ACTIVE,
+      });
+
+      const [newShift] = await tx
+        .select()
+        .from(shifts)
+        .where(eq(shifts.id, shiftId));
+
+      return newShift as Shift;
     });
 
     this.eventEmitter.emit(
@@ -64,40 +96,55 @@ export class ShiftService implements IShiftService {
   }
 
   async clockOut(userId: string): Promise<Shift> {
-    // Validate that user exists and is active
+    // Validate that user exists and is active (before opening transaction)
     const user = await this.userRepository.findById(userId);
     if (!user || !user.isActive) {
       throw new NotFoundException('User not found or inactive');
     }
 
-    // Check if user can clock out (has active shift)
-    const canClockOut = await this.validateClockOut(userId);
-    if (!canClockOut) {
-      throw new BadRequestException('No active shift found to clock out');
-    }
+    const completedShift = await this.db.transaction(async (tx) => {
+      // Within transaction: find the active shift
+      const [activeShift] = await tx
+        .select()
+        .from(shifts)
+        .where(
+          and(eq(shifts.userId, userId), eq(shifts.status, ShiftStatus.ACTIVE)),
+        );
 
-    // Find active shift
-    const activeShift = await this.shiftRepository.findActiveByUserId(userId);
-    if (!activeShift) {
-      throw new NotFoundException('No active shift found');
-    }
+      if (!activeShift) {
+        throw new BadRequestException('No active shift found to clock out');
+      }
 
-    // Update shift with clock out time and mark as completed
-    const updatedShift = await this.shiftRepository.update(activeShift.id, {
-      clockOutTime: new Date(),
-      status: ShiftStatus.COMPLETED,
+      const clockOutTime = new Date();
+
+      // Update shift atomically
+      await tx
+        .update(shifts)
+        .set({
+          clockOutTime,
+          status: ShiftStatus.COMPLETED,
+          updatedAt: clockOutTime,
+        })
+        .where(eq(shifts.id, activeShift.id));
+
+      const [updatedShift] = await tx
+        .select()
+        .from(shifts)
+        .where(eq(shifts.id, activeShift.id));
+
+      return updatedShift as Shift;
     });
 
     this.eventEmitter.emit(
       SHIFT_EVENTS.CLOCKED_OUT,
-      new ShiftClockedOutEvent(updatedShift),
+      new ShiftClockedOutEvent(completedShift),
     );
     this.eventEmitter.emit(
       SHIFT_EVENTS.COMPLETED,
-      new ShiftCompletedEvent(updatedShift),
+      new ShiftCompletedEvent(completedShift),
     );
 
-    return updatedShift;
+    return completedShift;
   }
 
   async getCurrentShift(userId: string): Promise<Shift | null> {
