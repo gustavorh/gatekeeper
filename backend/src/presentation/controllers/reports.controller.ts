@@ -6,6 +6,7 @@ import {
   Body,
   HttpCode,
   HttpStatus,
+  HttpException,
   UseGuards,
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -50,38 +51,24 @@ export class ReportsController {
   ) {}
 
   @Post('export')
-  @HttpCode(HttpStatus.ACCEPTED)
+  @HttpCode(HttpStatus.NOT_IMPLEMENTED)
   @ApiOperation({
-    summary: 'Enqueue a shift report export',
+    summary: 'Enqueue a shift report export (not yet implemented)',
     description:
-      'Enqueues an async report export job. Poll GET /admin/reports/jobs/:jobId for status.',
+      'D3: Report export feature is not yet implemented. Returns 501. Tracked in audit-4 D3.',
   })
   @ApiResponse({
-    status: 202,
-    description: 'Job enqueued',
-    schema: {
-      properties: {
-        jobId: { type: 'string' },
-        message: { type: 'string' },
-      },
-    },
+    status: 501,
+    description: 'Not Implemented',
   })
   async enqueueExport(
-    @CurrentUser() user: { id: string; organizationId: string },
-    @Body() dto: ReportExportRequestDto,
-  ): Promise<{ jobId: string; message: string }> {
-    const payload: ReportExportJob = {
-      organizationId: user.organizationId,
-      requestedBy: user.id,
-      startDate: dto.startDate,
-      endDate: dto.endDate,
-      format: dto.format,
-    };
-    const job = await this.exportQueue.add('export', payload, {
-      attempts: 3,
-      backoff: { type: 'exponential', delay: 5000 },
-    });
-    return { jobId: String(job.id), message: 'Export job enqueued' };
+    @CurrentUser() _user: { id: string; organizationId: string },
+    @Body() _dto: ReportExportRequestDto,
+  ): Promise<never> {
+    throw new HttpException(
+      'Report export not yet implemented. Tracked in audit-4 D3.',
+      HttpStatus.NOT_IMPLEMENTED,
+    );
   }
 
   @Get('jobs/:jobId')

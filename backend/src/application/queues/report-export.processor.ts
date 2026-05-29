@@ -17,22 +17,14 @@ export class ReportExportProcessor extends WorkerHost {
   private readonly logger = new Logger(ReportExportProcessor.name);
 
   async process(job: Job<ReportExportJob>): Promise<{ url: string }> {
-    const { organizationId, requestedBy, startDate, endDate, format } =
-      job.data;
-    this.logger.log(
-      `Processing report export job ${job.id} for org ${organizationId} by ${requestedBy}`,
+    // D3: Report export is not yet implemented. Fail the job explicitly so
+    // callers polling GET /admin/reports/jobs/:jobId see state='failed'
+    // instead of a fake completed URL.
+    this.logger.warn(
+      `Report export job ${job.id} rejected: feature not implemented yet. Tracked in audit-4 D3.`,
     );
-
-    await job.updateProgress(10);
-
-    // TODO: implement actual report generation — fetch shifts, format, upload to storage
-    // Placeholder: simulate work
-    await new Promise((r) => setTimeout(r, 100));
-
-    await job.updateProgress(100);
-
-    const url = `/reports/${organizationId}/${format}/${startDate}_${endDate}.${format}`;
-    this.logger.log(`Report export job ${job.id} completed: ${url}`);
-    return { url };
+    throw new Error(
+      'Report export not implemented yet. Tracked in audit-4 D3.',
+    );
   }
 }
