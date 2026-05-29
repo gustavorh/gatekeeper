@@ -1,6 +1,7 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { and, eq } from 'drizzle-orm';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { v4 as uuidv4 } from 'uuid';
 
 import { AppModule } from './app.module';
@@ -8,10 +9,7 @@ import { AuthService } from './application/services/auth.service';
 import type { IPermissionRepository } from './domain/repositories/permission.repository.interface';
 import type { IRoleRepository } from './domain/repositories/role.repository.interface';
 import type { IUserRepository } from './domain/repositories/user.repository.interface';
-import {
-  rolePermissions,
-  userRoles,
-} from './infrastructure/database/schema';
+import { rolePermissions, userRoles } from './infrastructure/database/schema';
 
 const PERMISSIONS = [
   {
@@ -78,7 +76,7 @@ async function seed(): Promise<void> {
   });
 
   try {
-    const db = app.get<any>('DATABASE');
+    const db = app.get<MySql2Database>('DATABASE');
     const userRepo = app.get<IUserRepository>('IUserRepository');
     const roleRepo = app.get<IRoleRepository>('IRoleRepository');
     const permRepo = app.get<IPermissionRepository>('IPermissionRepository');
@@ -139,9 +137,13 @@ async function seed(): Promise<void> {
     }
 
     const adminRut = process.env.SEED_ADMIN_RUT ?? '111111111';
-    const adminEmail =
-      process.env.SEED_ADMIN_EMAIL ?? 'admin@gatekeeper.local';
-    const adminPassword = process.env.SEED_ADMIN_PASSWORD ?? 'Admin1234';
+    const adminEmail = process.env.SEED_ADMIN_EMAIL ?? 'admin@gatekeeper.local';
+    const adminPassword = process.env.SEED_ADMIN_PASSWORD;
+    if (!adminPassword) {
+      throw new Error(
+        'SEED_ADMIN_PASSWORD env var is required. Set it before running the seed.',
+      );
+    }
     const adminFirstName = process.env.SEED_ADMIN_FIRST_NAME ?? 'Admin';
     const adminLastName = process.env.SEED_ADMIN_LAST_NAME ?? 'Gatekeeper';
 
@@ -183,14 +185,12 @@ async function seed(): Promise<void> {
     logger.log('Seed completado. Credenciales del admin:');
     logger.log(`  RUT:      ${adminRut}`);
     logger.log(`  Email:    ${adminEmail}`);
-    logger.log(`  Password: ${adminPassword}`);
   } finally {
     await app.close();
   }
 }
 
 seed().catch((err) => {
-  // eslint-disable-next-line no-console
   console.error(err);
   process.exit(1);
 });
