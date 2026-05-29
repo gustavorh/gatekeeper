@@ -9,10 +9,7 @@ import { Cache } from 'cache-manager';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
-import {
-  UserWithRolesResponse,
-  RoleResponse,
-} from '../dto/response.dto';
+import { UserWithRolesResponse, RoleResponse } from '../dto/response.dto';
 import { UpdateProfileDto, ProfileUpdateResponse } from '../dto/profile.dto';
 
 const userWithRolesKey = (userId: string) => `user:${userId}:withRoles`;

@@ -7,19 +7,13 @@ import {
 } from '@nestjs/common';
 import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
+import { v4 as uuidv4 } from 'uuid';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
-import {
-  User,
-  CreateUserDto,
-  UpdateUserDto,
-} from '../../domain/entities/user.entity';
-import {
-  Role,
-  CreateRoleDto,
-  UpdateRoleDto,
-} from '../../domain/entities/role.entity';
+import { User, UpdateUserDto } from '../../domain/entities/user.entity';
+import { Role, UpdateRoleDto } from '../../domain/entities/role.entity';
 import {
   Permission,
   CreatePermissionDto,
@@ -33,14 +27,16 @@ import {
   CreatePermissionAdminDto,
   UpdatePermissionAdminDto,
   PaginationDto,
-  UserListResponse,
   RoleListResponse,
   PermissionListResponse,
   UserListWithRolesResponse,
-  UserWithRolesResponseDto,
 } from '../dto/admin.dto';
 import { AuthService } from './auth.service';
 import { RegisterDto } from '../dto/auth.dto';
+import {
+  roles as rolesTable,
+  rolePermissions,
+} from '../../infrastructure/database/schema';
 
 @Injectable()
 export class AdminService {
@@ -56,6 +52,8 @@ export class AdminService {
     private readonly authService: AuthService,
     @Inject(CACHE_MANAGER)
     private readonly cache: Cache,
+    @Inject('DATABASE')
+    private readonly db: MySql2Database,
   ) {}
 
   private async invalidateUserCache(userId: string): Promise<void> {
@@ -258,23 +256,50 @@ export class AdminService {
       throw new BadRequestException('Role with this name already exists');
     }
 
-    const roleData: CreateRoleDto = {
-      name: createRoleDto.name,
-      description: createRoleDto.description,
-    };
-
-    const role = await this.roleRepository.create(roleData);
-
-    // Assign permissions if provided
+    // Validate all permission IDs upfront before opening the transaction
     if (createRoleDto.permissionIds && createRoleDto.permissionIds.length > 0) {
-      // Note: You might need to implement assignPermissionToRole in the repository
-      // For now, we'll just create the role
-      this.logger.log(
-        `Creating role with ${createRoleDto.permissionIds.length} permissions`,
-      );
+      for (const permissionId of createRoleDto.permissionIds) {
+        const permission =
+          await this.permissionRepository.findById(permissionId);
+        if (!permission) {
+          throw new BadRequestException(
+            `Permission with id "${permissionId}" does not exist`,
+          );
+        }
+      }
     }
 
-    return role;
+    return this.db.transaction(async (tx) => {
+      const roleId = uuidv4();
+
+      // Insert the new role inside the transaction
+      await tx.insert(rolesTable).values({
+        id: roleId,
+        name: createRoleDto.name,
+        description: createRoleDto.description ?? '',
+      });
+
+      // Insert role_permissions rows
+      if (
+        createRoleDto.permissionIds &&
+        createRoleDto.permissionIds.length > 0
+      ) {
+        const rpRows = createRoleDto.permissionIds.map((permissionId) => ({
+          id: uuidv4(),
+          roleId,
+          permissionId,
+        }));
+        await tx.insert(rolePermissions).values(rpRows);
+      }
+
+      // Return the newly created role by reading it back through the repository
+      // (repository uses its own db reference; we call it after commit)
+      const newRole = await this.roleRepository.findById(roleId);
+      if (!newRole) {
+        throw new BadRequestException('Role creation failed unexpectedly');
+      }
+      return newRole;
+    });
   }
 
   async getRoles(paginationDto: PaginationDto): Promise<RoleListResponse> {
@@ -572,9 +597,10 @@ export class AdminService {
         timestamp: new Date().toISOString(),
       };
     } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
       throw new BadRequestException({
         message: 'Failed to retrieve dashboard data',
-        error: error.message,
+        error: message,
       });
     }
   }

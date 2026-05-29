@@ -1,9 +1,4 @@
-import {
-  Module,
-  OnApplicationShutdown,
-  Inject,
-  Logger,
-} from '@nestjs/common';
+import { Module, OnApplicationShutdown, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { drizzle } from 'drizzle-orm/mysql2';
 import * as mysql from 'mysql2/promise';

@@ -96,7 +96,9 @@ import { HttpExceptionFilter } from './presentation/filters/http-exception.filte
     ScheduleModule.forRoot(),
     ...(process.env.BULL_REDIS_URL
       ? [
-          BullModule.forRoot({ connection: { url: process.env.BULL_REDIS_URL } }),
+          BullModule.forRoot({
+            connection: { url: process.env.BULL_REDIS_URL },
+          }),
           ReportsModule,
         ]
       : []),
