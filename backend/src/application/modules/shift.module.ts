@@ -8,6 +8,7 @@ import { UserRepository } from '../../infrastructure/repositories/user.repositor
 import { ShiftController } from '../../presentation/controllers/shift.controller';
 import { AnalyticsController } from '../../presentation/controllers/analytics.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
+import { RolesGuard } from '../../presentation/guards/roles.guard';
 import { OwnershipGuard } from '../../presentation/guards/ownership.guard';
 import { ShiftAuditListener } from '../listeners/shift-audit.listener';
 import { ShiftScheduleService } from '../services/shift-schedule.service';
@@ -24,6 +25,7 @@ import { RoleRepository } from '../../infrastructure/repositories/role.repositor
     UserRepository,
     RoleRepository,
     JwtAuthGuard,
+    RolesGuard,
     OwnershipGuard,
     ShiftAuditListener,
     {
@@ -39,6 +41,6 @@ import { RoleRepository } from '../../infrastructure/repositories/role.repositor
       useClass: RoleRepository,
     },
   ],
-  exports: [ShiftService, AnalyticsService],
+  exports: [ShiftService, AnalyticsService, RolesGuard],
 })
 export class ShiftModule {}

@@ -2,6 +2,8 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { AdminController } from './admin.controller';
 import { AdminService } from '../../application/services/admin.service';
 import { AdminAuthGuard } from '../middleware/admin-auth.guard';
+import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
+import { ShiftService } from '../../application/services/shift.service';
 import { PaginationDto } from '../../application/dto/admin.dto';
 
 describe('AdminController', () => {
@@ -29,8 +31,12 @@ describe('AdminController', () => {
     getDashboardData: jest.fn(),
   };
 
-  const mockAdminAuthGuard = {
-    canActivate: jest.fn(),
+  const mockGuard = { canActivate: jest.fn().mockReturnValue(true) };
+
+  const mockShiftService = {
+    getAllActiveShifts: jest.fn(),
+    getAllShifts: jest.fn(),
+    getAllShiftsWithFilters: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -41,10 +47,16 @@ describe('AdminController', () => {
           provide: AdminService,
           useValue: mockAdminService,
         },
+        {
+          provide: ShiftService,
+          useValue: mockShiftService,
+        },
       ],
     })
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockGuard)
       .overrideGuard(AdminAuthGuard)
-      .useValue(mockAdminAuthGuard)
+      .useValue(mockGuard)
       .compile();
 
     controller = module.get<AdminController>(AdminController);

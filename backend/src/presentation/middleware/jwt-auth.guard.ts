@@ -8,7 +8,8 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { Request } from 'express';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import {
   AUTH_TOKEN_COOKIE,
   AUTH_TOKEN_COOKIE_FALLBACK,
@@ -28,6 +29,8 @@ export class JwtAuthGuard implements CanActivate {
     private jwtService: JwtService,
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
+    @Inject('IRoleRepository')
+    private readonly roleRepository: IRoleRepository,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -55,9 +58,14 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('No active organization in session');
       }
 
+      // Load role names for RolesGuard — single query, cached by JwtAuthGuard result
+      const userRoles = await this.roleRepository.findUserRoles(user.id);
+      const roleNames = userRoles.map((r) => r.name);
+
       request['user'] = {
         ...user,
         organizationId,
+        roles: roleNames,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {

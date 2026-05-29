@@ -1,6 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AuthController } from './auth.controller';
 import { AuthService } from '../../application/services/auth.service';
+import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
 import { LoginDto, RegisterDto } from '../../application/dto/auth.dto';
 import { AuthResponse } from '../../application/dto/response.dto';
 import { BadRequestException } from '@nestjs/common';
@@ -9,6 +10,12 @@ import { BadRequestException } from '@nestjs/common';
 const mockAuthService = {
   login: jest.fn(),
   register: jest.fn(),
+};
+
+// Minimal mock for the Express Response object (used for cookie-setting)
+const mockRes = {
+  cookie: jest.fn(),
+  clearCookie: jest.fn(),
 };
 
 describe('AuthController', () => {
@@ -62,7 +69,10 @@ describe('AuthController', () => {
           useValue: mockAuthService,
         },
       ],
-    }).compile();
+    })
+      .overrideGuard(JwtAuthGuard)
+      .useValue({ canActivate: jest.fn().mockReturnValue(true) })
+      .compile();
 
     controller = module.get<AuthController>(AuthController);
     authService = module.get<AuthService>(AuthService);
@@ -80,13 +90,13 @@ describe('AuthController', () => {
 
       mockAuthService.login.mockResolvedValue(mockAuthResponse);
 
-      const result = await controller.login(loginDto);
+      const result = await controller.login(loginDto, mockRes as any);
 
       expect(authService.login).toHaveBeenCalledWith(loginDto);
       expect(result).toEqual(mockAuthResponse);
     });
 
-    it('should throw BadRequestException when login fails', async () => {
+    it('should propagate service errors without wrapping', async () => {
       const loginDto: LoginDto = {
         rut: '123456785',
         password: 'wrongpassword',
@@ -95,24 +105,8 @@ describe('AuthController', () => {
       const errorMessage = 'Invalid credentials';
       mockAuthService.login.mockRejectedValue(new Error(errorMessage));
 
-      await expect(controller.login(loginDto)).rejects.toThrow(
-        BadRequestException,
-      );
-
-      expect(authService.login).toHaveBeenCalledWith(loginDto);
-    });
-
-    it('should handle service exceptions and wrap them in BadRequestException', async () => {
-      const loginDto: LoginDto = {
-        rut: '123456785',
-        password: 'password123',
-      };
-
-      const serviceError = new Error('Service error');
-      mockAuthService.login.mockRejectedValue(serviceError);
-
-      await expect(controller.login(loginDto)).rejects.toThrow(
-        BadRequestException,
+      await expect(controller.login(loginDto, mockRes as any)).rejects.toThrow(
+        errorMessage,
       );
 
       expect(authService.login).toHaveBeenCalledWith(loginDto);
@@ -131,13 +125,13 @@ describe('AuthController', () => {
 
       mockAuthService.register.mockResolvedValue(mockAuthResponse);
 
-      const result = await controller.register(registerDto);
+      const result = await controller.register(registerDto, mockRes as any);
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
       expect(result).toEqual(mockAuthResponse);
     });
 
-    it('should throw BadRequestException when registration fails', async () => {
+    it('should propagate service errors without wrapping', async () => {
       const registerDto: RegisterDto = {
         rut: '123456785',
         email: 'existing@example.com',
@@ -149,28 +143,9 @@ describe('AuthController', () => {
       const errorMessage = 'User with this RUT already exists';
       mockAuthService.register.mockRejectedValue(new Error(errorMessage));
 
-      await expect(controller.register(registerDto)).rejects.toThrow(
-        BadRequestException,
-      );
-
-      expect(authService.register).toHaveBeenCalledWith(registerDto);
-    });
-
-    it('should handle service exceptions and wrap them in BadRequestException', async () => {
-      const registerDto: RegisterDto = {
-        rut: '123456785',
-        email: 'newuser@example.com',
-        password: 'password123',
-        firstName: 'Jane',
-        lastName: 'Smith',
-      };
-
-      const serviceError = new Error('Service error');
-      mockAuthService.register.mockRejectedValue(serviceError);
-
-      await expect(controller.register(registerDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.register(registerDto, mockRes as any),
+      ).rejects.toThrow(errorMessage);
 
       expect(authService.register).toHaveBeenCalledWith(registerDto);
     });
@@ -205,7 +180,7 @@ describe('AuthController', () => {
   });
 
   describe('Error handling', () => {
-    it('should handle UnauthorizedException from service', async () => {
+    it('should propagate errors from service (no wrapping in controller)', async () => {
       const loginDto: LoginDto = {
         rut: '123456785',
         password: 'wrongpassword',
@@ -214,12 +189,12 @@ describe('AuthController', () => {
       const unauthorizedError = new Error('Invalid credentials');
       mockAuthService.login.mockRejectedValue(unauthorizedError);
 
-      await expect(controller.login(loginDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.login(loginDto, mockRes as any),
+      ).rejects.toThrow('Invalid credentials');
     });
 
-    it('should handle ConflictException from service', async () => {
+    it('should propagate ConflictException from service', async () => {
       const registerDto: RegisterDto = {
         rut: '123456785',
         email: 'existing@example.com',
@@ -231,9 +206,9 @@ describe('AuthController', () => {
       const conflictError = new Error('User already exists');
       mockAuthService.register.mockRejectedValue(conflictError);
 
-      await expect(controller.register(registerDto)).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        controller.register(registerDto, mockRes as any),
+      ).rejects.toThrow('User already exists');
     });
   });
 });

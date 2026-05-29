@@ -2,32 +2,36 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { User } from '../../domain/entities/user.entity';
+import type { User } from '../../domain/entities/user.entity';
 
 // Mock the repositories
 const mockUserRepository = {
   findById: jest.fn(),
 };
 
-const mockJwtService = {
+const mockRoleRepository = {
+  findUserRoles: jest.fn(),
+};
+
+const mockJwtServiceLocal = {
   verifyAsync: jest.fn(),
 };
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
-  let jwtService: JwtService;
 
   const mockUser: User = {
     id: '123e4567-e89b-12d3-a456-426614174000',
     rut: '123456785',
     email: 'test@example.com',
-    password: 'hashedPassword',
     firstName: 'John',
     lastName: 'Doe',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
+
+  const mockRoles = [{ name: 'user' }];
 
   const mockExecutionContext = {
     switchToHttp: () => ({
@@ -46,20 +50,24 @@ describe('JwtAuthGuard', () => {
         JwtAuthGuard,
         {
           provide: JwtService,
-          useValue: mockJwtService,
+          useValue: mockJwtServiceLocal,
         },
         {
           provide: 'IUserRepository',
           useValue: mockUserRepository,
         },
+        {
+          provide: 'IRoleRepository',
+          useValue: mockRoleRepository,
+        },
       ],
     }).compile();
 
     guard = module.get<JwtAuthGuard>(JwtAuthGuard);
-    jwtService = module.get<JwtService>(JwtService);
 
     // Reset all mocks
     jest.clearAllMocks();
+    mockRoleRepository.findUserRoles.mockResolvedValue(mockRoles);
   });
 
   describe('canActivate', () => {
@@ -70,12 +78,12 @@ describe('JwtAuthGuard', () => {
         email: mockUser.email,
       };
 
-      mockJwtService.verifyAsync.mockResolvedValue(payload);
+      mockJwtServiceLocal.verifyAsync.mockResolvedValue(payload);
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
       const result = await guard.canActivate(mockExecutionContext);
 
-      expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(
+      expect(mockJwtServiceLocal.verifyAsync).toHaveBeenCalledWith(
         'valid-jwt-token',
       );
       expect(mockUserRepository.findById).toHaveBeenCalledWith(mockUser.id);
@@ -109,18 +117,20 @@ describe('JwtAuthGuard', () => {
         }),
       } as ExecutionContext;
 
-      await expect(guard.canActivate(contextWithInvalidToken)).rejects.toThrow(
-        UnauthorizedException,
-      );
+      await expect(
+        guard.canActivate(contextWithInvalidToken),
+      ).rejects.toThrow(UnauthorizedException);
     });
 
     it('should throw UnauthorizedException when token verification fails', async () => {
-      mockJwtService.verifyAsync.mockRejectedValue(new Error('Invalid token'));
+      mockJwtServiceLocal.verifyAsync.mockRejectedValue(
+        new Error('Invalid token'),
+      );
 
       await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockJwtService.verifyAsync).toHaveBeenCalledWith(
+      expect(mockJwtServiceLocal.verifyAsync).toHaveBeenCalledWith(
         'valid-jwt-token',
       );
     });
@@ -132,7 +142,7 @@ describe('JwtAuthGuard', () => {
         email: mockUser.email,
       };
 
-      mockJwtService.verifyAsync.mockResolvedValue(payload);
+      mockJwtServiceLocal.verifyAsync.mockResolvedValue(payload);
       mockUserRepository.findById.mockResolvedValue(null);
 
       await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
@@ -148,9 +158,9 @@ describe('JwtAuthGuard', () => {
         email: mockUser.email,
       };
 
-      const inactiveUser = { ...mockUser, isActive: false };
+      const inactiveUser: User = { ...mockUser, isActive: false };
 
-      mockJwtService.verifyAsync.mockResolvedValue(payload);
+      mockJwtServiceLocal.verifyAsync.mockResolvedValue(payload);
       mockUserRepository.findById.mockResolvedValue(inactiveUser);
 
       await expect(guard.canActivate(mockExecutionContext)).rejects.toThrow(
@@ -166,7 +176,7 @@ describe('JwtAuthGuard', () => {
         email: mockUser.email,
       };
 
-      const request = {
+      const request: Record<string, unknown> = {
         headers: {
           authorization: 'Bearer valid-jwt-token',
         },
@@ -179,13 +189,17 @@ describe('JwtAuthGuard', () => {
         }),
       } as ExecutionContext;
 
-      mockJwtService.verifyAsync.mockResolvedValue(payload);
+      mockJwtServiceLocal.verifyAsync.mockResolvedValue(payload);
       mockUserRepository.findById.mockResolvedValue(mockUser);
 
       const result = await guard.canActivate(context);
 
       expect(result).toBe(true);
-      expect(request.user).toEqual(mockUser);
+      expect(request.user).toMatchObject({
+        ...mockUser,
+        organizationId: 'gatekeeper-default',
+        roles: ['user'],
+      });
     });
   });
 
@@ -197,6 +211,7 @@ describe('JwtAuthGuard', () => {
         },
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = guard['extractTokenFromHeader'](request as any);
       expect(token).toBe('valid-jwt-token');
     });
@@ -208,6 +223,7 @@ describe('JwtAuthGuard', () => {
         },
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = guard['extractTokenFromHeader'](request as any);
       expect(token).toBeUndefined();
     });
@@ -217,6 +233,7 @@ describe('JwtAuthGuard', () => {
         headers: {},
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = guard['extractTokenFromHeader'](request as any);
       expect(token).toBeUndefined();
     });
@@ -228,6 +245,7 @@ describe('JwtAuthGuard', () => {
         },
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = guard['extractTokenFromHeader'](request as any);
       expect(token).toBeUndefined();
     });
@@ -239,6 +257,7 @@ describe('JwtAuthGuard', () => {
         },
       };
 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const token = guard['extractTokenFromHeader'](request as any);
       expect(token).toBeUndefined();
     });
