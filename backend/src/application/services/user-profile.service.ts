@@ -4,11 +4,9 @@ import {
   ConflictException,
   NotFoundException,
 } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
-import { IUserRepository } from '../../domain/repositories/user.repository.interface';
-import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
-import { IPermissionRepository } from '../../domain/repositories/permission.repository.interface';
+import type { IUserRepository } from '../../domain/repositories/user.repository.interface';
+import type { ICacheService } from '../interfaces/cache.service.interface';
+import { CACHE_SERVICE } from '../interfaces/cache.service.interface';
 import { UserWithRolesResponse, RoleResponse } from '../dto/response.dto';
 import { UpdateProfileDto, ProfileUpdateResponse } from '../dto/profile.dto';
 
@@ -23,12 +21,8 @@ export class UserProfileService {
   constructor(
     @Inject('IUserRepository')
     private readonly userRepository: IUserRepository,
-    @Inject('IRoleRepository')
-    private readonly roleRepository: IRoleRepository,
-    @Inject('IPermissionRepository')
-    private readonly permissionRepository: IPermissionRepository,
-    @Inject(CACHE_MANAGER)
-    private readonly cache: Cache,
+    @Inject(CACHE_SERVICE)
+    private readonly cache: ICacheService,
   ) {}
 
   async getUserWithRoles(
@@ -39,36 +33,22 @@ export class UserProfileService {
     );
     if (cached) return cached;
 
-    const user = await this.userRepository.findById(userId);
-    if (!user) return null;
+    // C5: single JOIN query instead of N+1
+    const result =
+      await this.userRepository.findByIdWithRolesAndPermissions(userId);
+    if (!result) return null;
 
-    const userRoles = await this.roleRepository.findUserRoles(userId);
+    const { user, roles } = result;
 
-    const rolesWithPermissions: RoleResponse[] = await Promise.all(
-      userRoles.map(async (role) => {
-        const permissions =
-          await this.permissionRepository.findPermissionsByRole(role.id);
-
-        return {
-          id: role.id,
-          name: role.name,
-          description: role.description,
-          isActive: role.isActive,
-          createdAt: role.createdAt,
-          updatedAt: role.updatedAt,
-          permissions: permissions.map((permission) => ({
-            id: permission.id,
-            name: permission.name,
-            description: permission.description,
-            resource: permission.resource,
-            action: permission.action,
-            isActive: permission.isActive,
-            createdAt: permission.createdAt,
-            updatedAt: permission.updatedAt,
-          })),
-        };
-      }),
-    );
+    const rolesWithPermissions: RoleResponse[] = roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+      description: role.description,
+      isActive: role.isActive,
+      createdAt: role.createdAt,
+      updatedAt: role.updatedAt,
+      permissions: role.permissions,
+    }));
 
     const response: UserWithRolesResponse = {
       id: user.id,

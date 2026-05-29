@@ -1,4 +1,4 @@
-import { Role, CreateRoleDto, UpdateRoleDto } from '../entities/role.entity';
+import type { Role, CreateRoleDto, UpdateRoleDto } from '../entities/role.entity';
 
 export interface IRoleRepository {
   create(role: CreateRoleDto): Promise<Role>;
@@ -11,4 +11,9 @@ export interface IRoleRepository {
   removeRoleFromUser(userId: string, roleId: string): Promise<void>;
   removeAllUserRoles(userId: string): Promise<void>;
   findUserRoles(userId: string): Promise<Role[]>;
+  /**
+   * Batch-loads roles for multiple users in a single query.
+   * Returns a map of userId → Role[].
+   */
+  findUserRolesBatch(userIds: string[]): Promise<Map<string, Role[]>>;
 }
