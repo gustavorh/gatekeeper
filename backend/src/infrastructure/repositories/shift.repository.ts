@@ -1,6 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { shifts, users } from '../database/schema';
-import { eq, and, desc, asc, sql, gte, lte } from 'drizzle-orm';
+import { eq, and, desc, sql, gte, lte, count } from 'drizzle-orm';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import {
   IShiftRepository,
   ShiftFilters,
@@ -12,11 +12,16 @@ import {
   ShiftWithUser,
   ShiftStatus,
 } from '../../domain/entities/shift.entity';
+import * as schema from '../database/schema';
 import { v4 as uuidv4 } from 'uuid';
+
+const { shifts, users } = schema;
 
 @Injectable()
 export class ShiftRepository implements IShiftRepository {
-  constructor(@Inject('DATABASE') private readonly db: any) {}
+  constructor(
+    @Inject('DATABASE') private readonly db: MySql2Database<typeof schema>,
+  ) {}
 
   async create(createShiftDto: CreateShiftDto): Promise<Shift> {
     const shiftId = uuidv4();
@@ -254,11 +259,11 @@ export class ShiftRepository implements IShiftRepository {
 
   async countByUserId(userId: string): Promise<number> {
     const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: count() })
       .from(shifts)
       .where(eq(shifts.userId, userId));
 
-    return result.count;
+    return Number(result.count);
   }
 
   async countByUserIdWithFilters(
@@ -284,11 +289,11 @@ export class ShiftRepository implements IShiftRepository {
     }
 
     const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: count() })
       .from(shifts)
       .where(and(...conditions));
 
-    return result.count;
+    return Number(result.count);
   }
 
   async findAllActiveWithUsers(
@@ -326,11 +331,11 @@ export class ShiftRepository implements IShiftRepository {
 
   async countAllActive(): Promise<number> {
     const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: count() })
       .from(shifts)
       .where(eq(shifts.status, ShiftStatus.ACTIVE));
 
-    return result.count;
+    return Number(result.count);
   }
 
   async findAllWithUsers(
@@ -367,10 +372,10 @@ export class ShiftRepository implements IShiftRepository {
 
   async countAll(): Promise<number> {
     const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: count() })
       .from(shifts);
 
-    return result.count;
+    return Number(result.count);
   }
 
   async findAllWithUsersAndFilters(
@@ -378,7 +383,7 @@ export class ShiftRepository implements IShiftRepository {
     limit: number = 50,
     offset: number = 0,
   ): Promise<ShiftWithUser[]> {
-    const conditions: any[] = [];
+    const conditions: ReturnType<typeof eq>[] = [];
 
     // Add date range filters
     if (filters.startDate) {
@@ -426,7 +431,7 @@ export class ShiftRepository implements IShiftRepository {
   }
 
   async countAllWithFilters(filters: ShiftFilters): Promise<number> {
-    const conditions: any[] = [];
+    const conditions: ReturnType<typeof eq>[] = [];
 
     // Add date range filters
     if (filters.startDate) {
@@ -445,10 +450,10 @@ export class ShiftRepository implements IShiftRepository {
     }
 
     const [result] = await this.db
-      .select({ count: sql<number>`count(*)` })
+      .select({ count: count() })
       .from(shifts)
       .where(conditions.length > 0 ? and(...conditions) : undefined);
 
-    return result.count;
+    return Number(result.count);
   }
 }

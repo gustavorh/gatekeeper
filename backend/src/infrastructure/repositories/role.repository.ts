@@ -1,5 +1,6 @@
 import { Injectable, Inject } from '@nestjs/common';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, inArray } from 'drizzle-orm';
+import type { MySql2Database } from 'drizzle-orm/mysql2';
 import { v4 as uuidv4 } from 'uuid';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import {
@@ -7,11 +8,15 @@ import {
   CreateRoleDto,
   UpdateRoleDto,
 } from '../../domain/entities/role.entity';
-import { roles, userRoles } from '../database/schema';
+import * as schema from '../database/schema';
+
+const { roles, userRoles } = schema;
 
 @Injectable()
 export class RoleRepository implements IRoleRepository {
-  constructor(@Inject('DATABASE') private readonly db: any) {}
+  constructor(
+    @Inject('DATABASE') private readonly db: MySql2Database<typeof schema>,
+  ) {}
 
   async create(role: CreateRoleDto): Promise<Role> {
     const roleId = uuidv4();
@@ -95,6 +100,38 @@ export class RoleRepository implements IRoleRepository {
       .where(eq(userRoles.userId, userId));
 
     return results;
+  }
+
+  /**
+   * Batch-loads roles for multiple users in a single query.
+   * Returns a map of userId → Role[].
+   */
+  async findUserRolesBatch(
+    userIds: string[],
+  ): Promise<Map<string, Role[]>> {
+    if (userIds.length === 0) return new Map();
+
+    const results = await this.db
+      .select({
+        userId: userRoles.userId,
+        id: roles.id,
+        name: roles.name,
+        description: roles.description,
+        isActive: roles.isActive,
+        createdAt: roles.createdAt,
+        updatedAt: roles.updatedAt,
+      })
+      .from(userRoles)
+      .innerJoin(roles, eq(userRoles.roleId, roles.id))
+      .where(inArray(userRoles.userId, userIds));
+
+    const map = new Map<string, Role[]>();
+    for (const row of results) {
+      const { userId, ...role } = row;
+      if (!map.has(userId)) map.set(userId, []);
+      map.get(userId)!.push(role as Role);
+    }
+    return map;
   }
 
   async removeRoleFromUser(userId: string, roleId: string): Promise<void> {

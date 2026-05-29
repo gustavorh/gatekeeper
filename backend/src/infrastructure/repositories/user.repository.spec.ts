@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { UserRepository } from './user.repository';
-import {
+import type {
   User,
   CreateUserDto,
   UpdateUserDto,
@@ -16,7 +16,6 @@ describe('UserRepository', () => {
     id: '123e4567-e89b-12d3-a456-426614174000',
     rut: '123456785',
     email: 'test@example.com',
-    password: 'hashedPassword',
     firstName: 'John',
     lastName: 'Doe',
     isActive: true,
@@ -157,27 +156,55 @@ describe('UserRepository', () => {
   });
 
   describe('findAll', () => {
-    it('should return all users', async () => {
+    it('should return paginated users with total', async () => {
       const mockUsers = [mockUser];
-      db.select.mockReturnValue({
-        from: jest.fn().mockResolvedValue(mockUsers),
-      });
+      // First call: count query; second call: data query
+      db.select
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 1 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                offset: jest.fn().mockResolvedValue(mockUsers),
+              }),
+            }),
+          }),
+        });
 
-      const result = await repository.findAll();
+      const result = await repository.findAll({ page: 1, limit: 20 });
 
       expect(db.select).toHaveBeenCalled();
-      expect(result).toEqual(mockUsers);
+      expect(result.total).toBe(1);
+      expect(result.page).toBe(1);
+      expect(result.limit).toBe(20);
     });
 
-    it('should return empty array when no users exist', async () => {
-      db.select.mockReturnValue({
-        from: jest.fn().mockResolvedValue([]),
-      });
+    it('should return empty result when no users exist', async () => {
+      db.select
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        })
+        .mockReturnValueOnce({
+          from: jest.fn().mockReturnValue({
+            where: jest.fn().mockReturnValue({
+              limit: jest.fn().mockReturnValue({
+                offset: jest.fn().mockResolvedValue([]),
+              }),
+            }),
+          }),
+        });
 
       const result = await repository.findAll();
 
       expect(db.select).toHaveBeenCalled();
-      expect(result).toEqual([]);
+      expect(result.total).toBe(0);
+      expect(result.data).toEqual([]);
     });
   });
 
