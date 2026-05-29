@@ -17,6 +17,7 @@ import {
   ShiftHistoryResponseDto,
 } from '../../application/dto/shift.dto';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
+import { OwnershipGuard } from '../guards/ownership.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import type { JwtPayload } from '../../application/types/jwt-payload';
 import {
@@ -228,10 +229,12 @@ export class ShiftController {
   }
 
   /**
-   * Get shift history for specific user (admin endpoint)
-   * Returns paginated shift history for a specific user with optional filters
+   * Get shift history for specific user (owner or admin endpoint)
+   * Returns paginated shift history for a specific user with optional filters.
+   * Access is restricted to the resource owner or users with admin role.
    */
   @Get('history/:userId')
+  @UseGuards(OwnershipGuard)
   @HttpCode(HttpStatus.OK)
   @ApiBearerAuth()
   @ApiOperation({

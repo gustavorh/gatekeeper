@@ -9,6 +9,7 @@ import {
 } from '@nestjs/common';
 import { AnalyticsService } from '../../application/services/analytics.service';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
+import { OwnershipGuard } from '../guards/ownership.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import type { JwtPayload } from '../../application/types/jwt-payload';
 import { WorkHoursSummary } from '../../domain/entities/shift.entity';
@@ -99,9 +100,10 @@ export class AnalyticsController {
   }
 
   /**
-   * Get work hours analytics for a specific user (admin only)
+   * Get work hours analytics for a specific user (owner or admin only)
    */
   @Get('work-hours/user/:userId')
+  @UseGuards(OwnershipGuard)
   async getUserWorkHoursAnalytics(
     @Param('userId') userId: string,
     @Query() query: UserWorkHoursQueryDto,
