@@ -1,4 +1,5 @@
 import type { User } from '../entities/user.entity';
+import type { UserWithRolesResponse } from '../../application/dto/response.dto';
 
 /**
  * Domain-level input for the login operation.
@@ -23,10 +24,10 @@ export interface RegisterData {
 
 /**
  * Domain-level representation of an authenticated user with a JWT.
- * The `user` field intentionally omits the password hash.
+ * The User type no longer carries the password field.
  */
 export interface AuthResult {
-  user: Omit<User, 'password'>;
+  user: UserWithRolesResponse;
   token: string;
 }
 
@@ -37,7 +38,7 @@ export interface AuthResult {
 export interface IAuthService {
   login(loginData: LoginData): Promise<AuthResult>;
   register(registerData: RegisterData): Promise<AuthResult>;
-  validateToken(token: string): Promise<Omit<User, 'password'> | null>;
+  validateToken(token: string): Promise<User | null>;
   hashPassword(password: string): Promise<string>;
   comparePassword(password: string, hashedPassword: string): Promise<boolean>;
 }

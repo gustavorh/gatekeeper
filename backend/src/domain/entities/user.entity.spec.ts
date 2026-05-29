@@ -1,13 +1,12 @@
-import { User, CreateUserDto, UpdateUserDto } from './user.entity';
+import type { User, UserWithPassword, CreateUserDto, UpdateUserDto } from './user.entity';
 
 describe('User Entity', () => {
-  describe('User Interface', () => {
-    it('should have all required properties', () => {
+  describe('User Interface (public — no password)', () => {
+    it('should have all required properties except password', () => {
       const user: User = {
         id: '123e4567-e89b-12d3-a456-426614174000',
         rut: '123456785',
         email: 'test@example.com',
-        password: 'hashedPassword',
         firstName: 'John',
         lastName: 'Doe',
         isActive: true,
@@ -18,12 +17,13 @@ describe('User Entity', () => {
       expect(user).toHaveProperty('id');
       expect(user).toHaveProperty('rut');
       expect(user).toHaveProperty('email');
-      expect(user).toHaveProperty('password');
       expect(user).toHaveProperty('firstName');
       expect(user).toHaveProperty('lastName');
       expect(user).toHaveProperty('isActive');
       expect(user).toHaveProperty('createdAt');
       expect(user).toHaveProperty('updatedAt');
+      // password must NOT be on the public User type
+      expect(user).not.toHaveProperty('password');
     });
 
     it('should allow optional properties in UpdateUserDto', () => {
@@ -56,9 +56,9 @@ describe('User Entity', () => {
     });
   });
 
-  describe('Type Validation', () => {
-    it('should enforce string types for required fields', () => {
-      const user: User = {
+  describe('UserWithPassword (internal use only)', () => {
+    it('should include the password hash field', () => {
+      const userWithPwd: UserWithPassword = {
         id: '123e4567-e89b-12d3-a456-426614174000',
         rut: '123456785',
         email: 'test@example.com',
@@ -70,10 +70,27 @@ describe('User Entity', () => {
         updatedAt: new Date(),
       };
 
+      expect(typeof userWithPwd.password).toBe('string');
+      expect(userWithPwd.password).toBe('hashedPassword');
+    });
+  });
+
+  describe('Type Validation', () => {
+    it('should enforce string types for required fields', () => {
+      const user: User = {
+        id: '123e4567-e89b-12d3-a456-426614174000',
+        rut: '123456785',
+        email: 'test@example.com',
+        firstName: 'John',
+        lastName: 'Doe',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
       expect(typeof user.id).toBe('string');
       expect(typeof user.rut).toBe('string');
       expect(typeof user.email).toBe('string');
-      expect(typeof user.password).toBe('string');
       expect(typeof user.firstName).toBe('string');
       expect(typeof user.lastName).toBe('string');
       expect(typeof user.isActive).toBe('boolean');

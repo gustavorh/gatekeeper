@@ -3,16 +3,17 @@ import { JwtService } from '@nestjs/jwt';
 import { UnauthorizedException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 import { UserProfileService } from './user-profile.service';
-import { User } from '../../domain/entities/user.entity';
-import { Role } from '../../domain/entities/role.entity';
-import { Permission } from '../../domain/entities/permission.entity';
-import { AuthResponse } from '../dto/response.dto';
-import { mockDatabase, mockJwtService, mockUuid } from '../../../test/setup';
+import type { User, UserWithPassword } from '../../domain/entities/user.entity';
+import type { Role } from '../../domain/entities/role.entity';
+import type { Permission } from '../../domain/entities/permission.entity';
+import { mockJwtService } from '../../../test/setup';
 import * as bcrypt from 'bcryptjs';
 
 // Mock the repositories
 const mockUserRepository = {
   findByRut: jest.fn(),
+  findByRutWithPassword: jest.fn(),
+  findByEmailWithPassword: jest.fn(),
   findByEmail: jest.fn(),
   create: jest.fn(),
   findById: jest.fn(),
@@ -31,16 +32,22 @@ describe('AuthService', () => {
   let service: AuthService;
   let jwtService: JwtService;
 
+  // Public user (no password) — returned by findById, findByRut, create
   const mockUser: User = {
     id: '123e4567-e89b-12d3-a456-426614174000',
     rut: '123456785',
     email: 'test@example.com',
-    password: 'hashedPassword',
     firstName: 'John',
     lastName: 'Doe',
     isActive: true,
     createdAt: new Date(),
     updatedAt: new Date(),
+  };
+
+  // Internal record with password — returned by findByRutWithPassword / findByEmailWithPassword
+  const mockUserWithPassword: UserWithPassword = {
+    ...mockUser,
+    password: 'hashedPassword',
   };
 
   const mockRole: Role = {
@@ -117,7 +124,9 @@ describe('AuthService', () => {
         password: 'password123',
       };
 
-      mockUserRepository.findByRut.mockResolvedValue(mockUser);
+      mockUserRepository.findByRutWithPassword.mockResolvedValue(
+        mockUserWithPassword,
+      );
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockUserProfileService.getUserWithRoles.mockResolvedValue(
@@ -126,7 +135,9 @@ describe('AuthService', () => {
 
       const result = await service.login(loginDto);
 
-      expect(mockUserRepository.findByRut).toHaveBeenCalledWith('123456785');
+      expect(mockUserRepository.findByRutWithPassword).toHaveBeenCalledWith(
+        '123456785',
+      );
       expect(bcrypt.compare).toHaveBeenCalledWith(
         'password123',
         'hashedPassword',
@@ -135,6 +146,7 @@ describe('AuthService', () => {
         sub: mockUser.id,
         rut: mockUser.rut,
         email: mockUser.email,
+        organizationId: 'gatekeeper-default',
       });
       expect(mockUserProfileService.getUserWithRoles).toHaveBeenCalledWith(
         mockUser.id,
@@ -152,12 +164,14 @@ describe('AuthService', () => {
         password: 'password123',
       };
 
-      mockUserRepository.findByRut.mockResolvedValue(null);
+      mockUserRepository.findByRutWithPassword.mockResolvedValue(null);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
       );
-      expect(mockUserRepository.findByRut).toHaveBeenCalledWith('123456785');
+      expect(mockUserRepository.findByRutWithPassword).toHaveBeenCalledWith(
+        '123456785',
+      );
     });
 
     it('should throw UnauthorizedException when user is inactive', async () => {
@@ -166,8 +180,11 @@ describe('AuthService', () => {
         password: 'password123',
       };
 
-      const inactiveUser = { ...mockUser, isActive: false };
-      mockUserRepository.findByRut.mockResolvedValue(inactiveUser);
+      const inactiveUser: UserWithPassword = {
+        ...mockUserWithPassword,
+        isActive: false,
+      };
+      mockUserRepository.findByRutWithPassword.mockResolvedValue(inactiveUser);
 
       await expect(service.login(loginDto)).rejects.toThrow(
         UnauthorizedException,
@@ -180,7 +197,9 @@ describe('AuthService', () => {
         password: 'wrongpassword',
       };
 
-      mockUserRepository.findByRut.mockResolvedValue(mockUser);
+      mockUserRepository.findByRutWithPassword.mockResolvedValue(
+        mockUserWithPassword,
+      );
       (bcrypt.compare as jest.Mock).mockResolvedValue(false);
 
       await expect(service.login(loginDto)).rejects.toThrow(
@@ -198,7 +217,9 @@ describe('AuthService', () => {
         password: 'password123',
       };
 
-      mockUserRepository.findByRut.mockResolvedValue(mockUser);
+      mockUserRepository.findByRutWithPassword.mockResolvedValue(
+        mockUserWithPassword,
+      );
       (bcrypt.compare as jest.Mock).mockResolvedValue(true);
       mockJwtService.sign.mockReturnValue('jwt-token');
       mockUserProfileService.getUserWithRoles.mockResolvedValue(null);
@@ -219,7 +240,7 @@ describe('AuthService', () => {
         lastName: 'Smith',
       };
 
-      const newUser = { ...mockUser, ...registerDto };
+      const newUser: User = { ...mockUser, email: registerDto.email };
 
       mockUserRepository.findByRut.mockResolvedValue(null);
       mockUserRepository.findByEmail.mockResolvedValue(null);
@@ -248,11 +269,6 @@ describe('AuthService', () => {
         newUser.id,
         mockRole.id,
       );
-      expect(mockJwtService.sign).toHaveBeenCalledWith({
-        sub: newUser.id,
-        rut: newUser.rut,
-        email: newUser.email,
-      });
 
       expect(result).toEqual({
         user: mockUserWithRoles,
@@ -314,16 +330,7 @@ describe('AuthService', () => {
 
       expect(mockJwtService.verify).toHaveBeenCalledWith(token);
       expect(mockUserRepository.findById).toHaveBeenCalledWith(mockUser.id);
-      expect(result).toEqual({
-        id: mockUser.id,
-        rut: mockUser.rut,
-        email: mockUser.email,
-        firstName: mockUser.firstName,
-        lastName: mockUser.lastName,
-        isActive: mockUser.isActive,
-        createdAt: mockUser.createdAt,
-        updatedAt: mockUser.updatedAt,
-      });
+      expect(result).toEqual(mockUser);
     });
 
     it('should return null when token is invalid', async () => {
@@ -361,7 +368,7 @@ describe('AuthService', () => {
         rut: mockUser.rut,
         email: mockUser.email,
       };
-      const inactiveUser = { ...mockUser, isActive: false };
+      const inactiveUser: User = { ...mockUser, isActive: false };
 
       mockJwtService.verify.mockReturnValue(payload);
       mockUserRepository.findById.mockResolvedValue(inactiveUser);

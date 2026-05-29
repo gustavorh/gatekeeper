@@ -17,7 +17,7 @@ import {
 import { ChangePasswordDto } from '../dto/profile.dto';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
-import { User } from '../../domain/entities/user.entity';
+import { User, UserWithPassword } from '../../domain/entities/user.entity';
 import { UserProfileService } from './user-profile.service';
 
 @Injectable()
@@ -32,24 +32,26 @@ export class AuthService implements IAuthService {
   ) {}
 
   async login(loginData: LoginData): Promise<AuthResult> {
-    const user = await this.userRepository.findByRut(loginData.rut);
+    const userWithPwd = await this.userRepository.findByRutWithPassword(
+      loginData.rut,
+    );
 
-    if (!user || !user.isActive) {
+    if (!userWithPwd || !userWithPwd.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await this.comparePassword(
       loginData.password,
-      user.password,
+      userWithPwd.password,
     );
 
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    const token = this.generateToken(user);
+    const token = this.generateToken(userWithPwd);
     const userWithRoles = await this.userProfileService.getUserWithRoles(
-      user.id,
+      userWithPwd.id,
     );
 
     if (!userWithRoles) {
@@ -110,7 +112,7 @@ export class AuthService implements IAuthService {
     };
   }
 
-  async validateToken(token: string): Promise<Omit<User, 'password'> | null> {
+  async validateToken(token: string): Promise<User | null> {
     try {
       const payload = this.jwtService.verify<{ sub: string }>(token);
       const user = await this.userRepository.findById(payload.sub);
@@ -119,7 +121,7 @@ export class AuthService implements IAuthService {
         return null;
       }
 
-      return this.excludePassword(user);
+      return user;
     } catch {
       return null;
     }
@@ -129,16 +131,23 @@ export class AuthService implements IAuthService {
     userId: string,
     changePasswordDto: ChangePasswordDto,
   ): Promise<{ success: boolean; message: string }> {
-    // Find the user
+    // Need the password hash — use the email-based lookup via findById then re-fetch with password
     const user = await this.userRepository.findById(userId);
     if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    const userWithPwd = await this.userRepository.findByEmailWithPassword(
+      user.email,
+    );
+    if (!userWithPwd) {
       throw new NotFoundException('User not found');
     }
 
     // Verify current password
     const isCurrentPasswordValid = await this.comparePassword(
       changePasswordDto.currentPassword,
-      user.password,
+      userWithPwd.password,
     );
 
     if (!isCurrentPasswordValid) {
@@ -148,7 +157,7 @@ export class AuthService implements IAuthService {
     // Check if new password is different from current password
     const isSamePassword = await this.comparePassword(
       changePasswordDto.newPassword,
-      user.password,
+      userWithPwd.password,
     );
 
     if (isSamePassword) {
@@ -185,7 +194,7 @@ export class AuthService implements IAuthService {
     return bcrypt.compare(password, hashedPassword);
   }
 
-  private generateToken(user: User): string {
+  private generateToken(user: UserWithPassword | User): string {
     const payload = {
       sub: user.id,
       rut: user.rut,
@@ -199,9 +208,5 @@ export class AuthService implements IAuthService {
     return this.jwtService.sign(payload);
   }
 
-  private excludePassword(user: User): Omit<User, 'password'> {
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = user;
-    return userWithoutPassword;
-  }
+  // Password is no longer on the public User type; this method is no longer needed.
 }
