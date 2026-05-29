@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { JwtConfigModule } from '../../infrastructure/config/jwt-config.module';
 import { AdminController } from '../../presentation/controllers/admin.controller';
 import { AdminService } from '../services/admin.service';
 import { AdminAuthGuard } from '../../presentation/middleware/admin-auth.guard';
@@ -12,15 +12,7 @@ import { AuthModule } from './auth.module';
 import { ShiftModule } from './shift.module';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    AuthModule,
-    ShiftModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '24h' },
-    }),
-  ],
+  imports: [DatabaseModule, JwtConfigModule, AuthModule, ShiftModule],
   controllers: [AdminController],
   providers: [
     AdminService,

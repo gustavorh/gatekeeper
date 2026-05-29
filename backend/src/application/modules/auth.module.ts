@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { JwtConfigModule } from '../../infrastructure/config/jwt-config.module';
 import { UserRepository } from '../../infrastructure/repositories/user.repository';
 import { RoleRepository } from '../../infrastructure/repositories/role.repository';
 import { PermissionRepository } from '../../infrastructure/repositories/permission.repository';
@@ -11,13 +11,7 @@ import { UserController } from '../../presentation/controllers/user.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '24h' },
-    }),
-  ],
+  imports: [DatabaseModule, JwtConfigModule],
   controllers: [AuthController, UserController],
   providers: [
     AuthService,

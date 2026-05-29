@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
+import { JwtConfigModule } from '../../infrastructure/config/jwt-config.module';
 import { ShiftService } from '../services/shift.service';
 import { AnalyticsService } from '../services/analytics.service';
 import { ShiftRepository } from '../../infrastructure/repositories/shift.repository';
@@ -8,17 +8,13 @@ import { UserRepository } from '../../infrastructure/repositories/user.repositor
 import { ShiftController } from '../../presentation/controllers/shift.controller';
 import { AnalyticsController } from '../../presentation/controllers/analytics.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
+import { OwnershipGuard } from '../../presentation/guards/ownership.guard';
 import { ShiftAuditListener } from '../listeners/shift-audit.listener';
 import { ShiftScheduleService } from '../services/shift-schedule.service';
+import { RoleRepository } from '../../infrastructure/repositories/role.repository';
 
 @Module({
-  imports: [
-    DatabaseModule,
-    JwtModule.register({
-      secret: process.env.JWT_SECRET || 'your-secret-key',
-      signOptions: { expiresIn: '24h' },
-    }),
-  ],
+  imports: [DatabaseModule, JwtConfigModule],
   controllers: [ShiftController, AnalyticsController],
   providers: [
     ShiftService,
@@ -26,7 +22,9 @@ import { ShiftScheduleService } from '../services/shift-schedule.service';
     ShiftScheduleService,
     ShiftRepository,
     UserRepository,
+    RoleRepository,
     JwtAuthGuard,
+    OwnershipGuard,
     ShiftAuditListener,
     {
       provide: 'IShiftRepository',
@@ -35,6 +33,10 @@ import { ShiftScheduleService } from '../services/shift-schedule.service';
     {
       provide: 'IUserRepository',
       useClass: UserRepository,
+    },
+    {
+      provide: 'IRoleRepository',
+      useClass: RoleRepository,
     },
   ],
   exports: [ShiftService, AnalyticsService],
