@@ -104,6 +104,77 @@ Leyenda de prioridad:
 
 ---
 
+## audit-4 (2026-05) — Deuda de Clean Architecture + Seguridad Backend
+
+> Método: 3 ejes en paralelo (CA, seguridad, integridad de datos), cross-validación por pares de agentes. Solo ítems neto-nuevos; ver `audit-4-backend-arquitectura-seguridad.md` para el informe completo.
+
+### Revalidación de ítems previos (todos abiertos)
+
+| ID | Descripción | Estado | Cambio |
+|----|-------------|--------|--------|
+| P0-1 | Multi-tenant (tabla `organizations`) | Abierto — diferido | Sin cambio |
+| P0-2 | Sin transacciones | Abierto | Sin cambio |
+| P1-1 | JWT secret fallback `'secret'` | Abierto | Sin cambio |
+| P1-2 | Paginación en memoria | Abierto | Sin cambio |
+| P1-3 | Índices FK faltantes | Abierto | Ampliado con C3 (shifts.status) |
+| P2-1 | `db: any` en repositorios | Abierto | Sin cambio |
+| **P2-2** | **IDOR en endpoints `/:userId`** | **Abierto** | **⬆ Reclasificado P2 → P1** (activo en single-tenant) |
+| P2-3 | `throw new Error` en user.controller | Abierto | Sin cambio |
+
+### Ítems neto-nuevos
+
+#### Clean Architecture
+
+| # | Stack | Prioridad | Ubicación | Patrón actual | Propuesta | Esfuerzo | Owner |
+|---|-------|-----------|-----------|---------------|-----------|----------|-------|
+| A1 | Backend | **P0** | `domain/entities/user.entity.ts:1,15` / `domain/services/auth.service.interface.ts:3` | Domain importa DTOs de application (`RegisterDto`, `LoginDto`) | Tipos de entrada propios del dominio; mapper DTO→dominio en application | M | backend-developer |
+| A2 | Backend | P1 | `infrastructure/repositories/user.repository.ts` | Filas Drizzle casteadas como entidades de dominio; `password` propagado hasta el controller | Mappers `rowToEntity()` en repos + `entityToResponseDto()` en application | M | backend-developer |
+| A3 | Backend | P1 | `presentation/middleware/admin-auth.guard.ts:8,13` | Guard inyecta `IRoleRepository` y resuelve lógica de autorización | `@Roles()` decorator + `RolesGuard` delgado + `AuthorizationService` | M | backend-developer |
+| A4 | Backend | P1 | `presentation/controllers/shift.controller.ts:77,78` / `analytics.controller.ts:30` | `@CurrentUser() user: any` + `return x as Promise<ShiftResponseDto>` | Tipar `@CurrentUser()` con interfaz concreta; eliminar casts | S | backend-developer |
+| A5 | Backend | P2 | `application/services/admin.service.ts:42,56` | `AdminService.createUser()` llama `AuthService.register()` | Extraer `UserDomainService` o usar repositorio directamente | M | backend-developer |
+| A6 | Backend | P2 | `application/services/admin.service.ts:57` / `user-profile.service.ts:33` | `CACHE_MANAGER` inyectado directo en application; claves hardcodeadas duplicadas | `ICacheService` en domain/application; implementación en infrastructure | S | backend-developer |
+| A7 | Backend | P3 | `backend/src/seed.ts` | Seed usa Drizzle crudo, saltando repositorios | Seed llama a servicios/repositorios de production | S | backend-developer |
+| A8 | Backend | P3 | Servicios de application (shift, user) | Entidades anémicas; reglas de negocio en application | Mover invariantes a métodos de entidad cuando las reglas crezcan | — | backend-developer |
+
+#### Seguridad
+
+| # | Stack | Prioridad | Ubicación | Patrón actual | Propuesta | Esfuerzo | Owner |
+|---|-------|-----------|-----------|---------------|-----------|----------|-------|
+| B1 | Backend | **P0** | `seed.ts:144,186` | `logger.log(\`Password: ${adminPassword}\`)` + default `'Admin1234'` | No loguear; exigir `SEED_ADMIN_PASSWORD`; forzar cambio en primer login | XS | backend-developer |
+| B2 | Backend | P1 | `jwt-auth.guard.ts:52` / `auth.service.ts:117` | `catch` genérico retorna `null` para cualquier error JWT | Distinguir `TokenExpiredError` vs `JsonWebTokenError`; loguear con nivel correcto | S | backend-developer |
+| B3 | Backend | P1 | `application/dto/auth.dto.ts:39` | `@MinLength(6)` | Subir a 12 + regex de complejidad | XS | backend-developer |
+| B4 | Backend | P1 | `main.ts` | Sin límite de tamaño de body | `express.json({ limit: '100kb' })` en `main.ts` | XS | backend-developer |
+| B5 | Backend | P2 | `presentation/filters/http-exception.filter.ts` | `details: any` puede filtrar stack traces en prod | Sanear `details` en prod; loguear completo server-side | S | backend-developer |
+| B6 | Backend | P2 | auth flow / admin actions | Sin revocación de token; sin audit log de acciones admin | Tabla `revoked_tokens` (o Redis); ligado a P1 audit logs ya en roadmap | L | backend-developer |
+
+#### Integridad de datos / Drizzle
+
+| # | Stack | Prioridad | Ubicación | Patrón actual | Propuesta | Esfuerzo | Owner |
+|---|-------|-----------|-----------|---------------|-----------|----------|-------|
+| C1 | Backend | P1 | `schema.ts:43–63` | Sin UNIQUE compuesto en `user_roles(user_id, role_id)` ni `role_permissions(role_id, permission_id)` | `uniqueIndex` compuesto en ambas tablas; nueva migración | S | backend-developer |
+| C2 | Backend | P1 | `schema.ts` / migración `0000_*` | FKs sin `ON DELETE CASCADE` (`NO ACTION` implícito) | `onDelete: 'cascade'` en Drizzle para `user_roles`, `role_permissions`, `shifts` | S | backend-developer |
+| C3 | Backend | P1 | `schema.ts` / shift queries | Sin índice en `shifts.status` (filtrado en `findActiveByUserId`) | Índice en `shifts.status` + compuesto `(user_id, status)`; amplía P1-3 | XS | backend-developer |
+| C4 | Backend | P2 | repos de usuarios | `isActive` filtrado en memoria tras `findAll()` | `where(eq(users.isActive, true))` en el repositorio | S | backend-developer |
+| C5 | Backend | P2 | `admin.service.ts` `getUsers()` / `user-profile.service.ts` `getUserWithRoles()` | N+1: query por usuario, luego query por rol | JOIN o `inArray` batch en repositorio | M | backend-developer |
+
+#### Funcionalidad incompleta
+
+| # | Stack | Prioridad | Ubicación | Patrón actual | Propuesta | Esfuerzo | Owner |
+|---|-------|-----------|-----------|---------------|-----------|----------|-------|
+| D1 | Backend | **P1** | `admin.service.ts:269–273` | `createRole` loguea `permissionIds` pero no los inserta en `role_permissions` | Implementar INSERT en `role_permissions` dentro de transacción | S | backend-developer |
+| D2 | Backend | P1 | `admin.service.ts:516+` | `getDashboardData()` retorna mock hardcodeado | Queries reales de agregación en `ShiftRepository` y `UserRepository` | L | backend-developer |
+| D3 | Backend | P2 | `queues/report-export.processor.ts` | Stub `// TODO`; genera URL falsa sin reporte real | Implementar CSV/PDF o retornar `501` hasta que esté listo | L | backend-developer |
+
+#### Config / Testing
+
+| # | Stack | Prioridad | Ubicación | Patrón actual | Propuesta | Esfuerzo | Owner |
+|---|-------|-----------|-----------|---------------|-----------|----------|-------|
+| E1 | Backend | P1 | `auth/admin/shift.module.ts` | `JwtModule.register({ secret: process.env.JWT_SECRET })` duplicado en 3 módulos | `JwtConfigModule` async compartido; consolida P1-1 | S | backend-developer |
+| E2 | Backend | P1 | `env.validation.ts` / `env.example` | `LOG_LEVEL`, `SEED_ADMIN_PASSWORD`, `BULL_REDIS_URL` fuera del schema de validación | Completar schema Joi + actualizar `env.example` | XS | backend-developer |
+| E3 | Backend | P1 | `shift.service.ts`, `analytics.service.ts`, repos | Cobertura de tests ausente en lógica core | Unit tests de `shift.service`; E2E login→clockIn→clockOut | L | qa-tester |
+
+---
+
 ## Hallazgos del auditor (cómo se nutre este doc)
 
 El `framework-leverage-auditor` (ver `.claude/agents/framework-leverage-auditor.md`) añade hallazgos aquí cada vez que detecta un patrón infrautilizado. Formato:
