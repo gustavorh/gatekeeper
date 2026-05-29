@@ -2,12 +2,15 @@ import { validate } from 'class-validator';
 import { plainToClass } from 'class-transformer';
 import { LoginDto, RegisterDto } from './auth.dto';
 
+// B3 compliant password: ≥12 chars, at least one uppercase, one lowercase, one digit
+const VALID_PASSWORD = 'SecurePass123!';
+
 describe('Auth DTOs', () => {
   describe('LoginDto', () => {
     it('should validate correct login data', async () => {
       const loginData = {
         rut: '123456785',
-        password: 'password123',
+        password: VALID_PASSWORD,
       };
 
       const loginDto = plainToClass(LoginDto, loginData);
@@ -19,7 +22,7 @@ describe('Auth DTOs', () => {
     it('should validate RUT with hyphen', async () => {
       const loginData = {
         rut: '12345678-5',
-        password: 'password123',
+        password: VALID_PASSWORD,
       };
 
       const loginDto = plainToClass(LoginDto, loginData);
@@ -31,7 +34,7 @@ describe('Auth DTOs', () => {
     it('should reject invalid RUT format', async () => {
       const loginData = {
         rut: '1234567',
-        password: 'password123',
+        password: VALID_PASSWORD,
       };
 
       const loginDto = plainToClass(LoginDto, loginData);
@@ -54,10 +57,10 @@ describe('Auth DTOs', () => {
       expect(errors[0].constraints?.isNotEmpty).toBeDefined();
     });
 
-    it('should reject password shorter than 6 characters', async () => {
+    it('should reject password shorter than 12 characters', async () => {
       const loginData = {
         rut: '123456785',
-        password: '12345',
+        password: 'Short1!',
       };
 
       const loginDto = plainToClass(LoginDto, loginData);
@@ -67,9 +70,23 @@ describe('Auth DTOs', () => {
       expect(errors[0].constraints?.minLength).toBeDefined();
     });
 
+    it('should reject password without uppercase letter', async () => {
+      const loginData = {
+        rut: '123456785',
+        password: 'nouppercase123!',
+      };
+
+      const loginDto = plainToClass(LoginDto, loginData);
+      const errors = await validate(loginDto);
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].constraints?.matches).toBeDefined();
+    });
+
     it('should reject non-string password', async () => {
       const loginData = {
         rut: '123456785',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
         password: 123456 as any,
       };
 
@@ -83,7 +100,7 @@ describe('Auth DTOs', () => {
     it('should reject empty RUT', async () => {
       const loginData = {
         rut: '',
-        password: 'password123',
+        password: VALID_PASSWORD,
       };
 
       const loginDto = plainToClass(LoginDto, loginData);
@@ -99,7 +116,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -114,7 +131,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '12345678-5',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -129,7 +146,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'invalid-email',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -145,7 +162,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: '',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -157,11 +174,11 @@ describe('Auth DTOs', () => {
       expect(errors[0].constraints?.isNotEmpty).toBeDefined();
     });
 
-    it('should reject password shorter than 6 characters', async () => {
+    it('should reject password shorter than 12 characters', async () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: '12345',
+        password: 'Short1!',
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -173,11 +190,27 @@ describe('Auth DTOs', () => {
       expect(errors[0].constraints?.minLength).toBeDefined();
     });
 
+    it('should reject password without complexity requirements', async () => {
+      const registerData = {
+        rut: '123456785',
+        email: 'test@example.com',
+        password: 'alllowercase1234',
+        firstName: 'John',
+        lastName: 'Doe',
+      };
+
+      const registerDto = plainToClass(RegisterDto, registerData);
+      const errors = await validate(registerDto);
+
+      expect(errors.length).toBeGreaterThan(0);
+      expect(errors[0].constraints?.matches).toBeDefined();
+    });
+
     it('should reject empty firstName', async () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: '',
         lastName: 'Doe',
       };
@@ -193,7 +226,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: '',
       };
@@ -209,7 +242,8 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
         firstName: 123 as any,
         lastName: 'Doe',
       };
@@ -225,8 +259,9 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
         lastName: 123 as any,
       };
 
@@ -241,7 +276,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '1234567',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -259,7 +294,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'TEST@EXAMPLE.COM',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };
@@ -272,7 +307,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: '  John  ',
         lastName: 'Doe',
       };
@@ -285,7 +320,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '123456785',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: '  Doe  ',
       };
@@ -298,7 +333,7 @@ describe('Auth DTOs', () => {
       const registerData = {
         rut: '12345678-5',
         email: 'test@example.com',
-        password: 'password123',
+        password: VALID_PASSWORD,
         firstName: 'John',
         lastName: 'Doe',
       };

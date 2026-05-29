@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, IsNotEmpty } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsNotEmpty,
+  Matches,
+} from 'class-validator';
 import { Transform } from 'class-transformer';
 import { IsRut } from '../decorators/is-rut.decorator';
 import { RutValidator } from '../../utils/rut-validator';
@@ -31,12 +37,16 @@ export class LoginDto {
 
   @ApiProperty({
     description: 'User password',
-    example: 'password123',
-    minLength: 6,
+    example: 'SecureP4ss',
+    minLength: 12,
   })
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(6, { message: 'Password must have at least 6 characters' })
+  @MinLength(12, { message: 'Password must have at least 12 characters' })
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+  })
   password: string;
 }
 
@@ -82,12 +92,16 @@ export class RegisterDto {
 
   @ApiProperty({
     description: 'User password',
-    example: 'password123',
-    minLength: 6,
+    example: 'SecureP4ss!',
+    minLength: 12,
   })
   @IsString({ message: 'Password must be a string' })
   @IsNotEmpty({ message: 'Password is required' })
-  @MinLength(6, { message: 'Password must have at least 6 characters' })
+  @MinLength(12, { message: 'Password must have at least 12 characters' })
+  @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
+    message:
+      'Password must contain at least one uppercase letter, one lowercase letter, and one number',
+  })
   password: string;
 
   @ApiProperty({
