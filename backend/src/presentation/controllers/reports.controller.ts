@@ -10,7 +10,12 @@ import {
 } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from '@nestjs/swagger';
 import { IsString, IsIn, IsDateString } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
@@ -90,7 +95,10 @@ export class ReportsController {
     schema: {
       properties: {
         id: { type: 'string' },
-        state: { type: 'string', enum: ['waiting', 'active', 'completed', 'failed'] },
+        state: {
+          type: 'string',
+          enum: ['waiting', 'active', 'completed', 'failed'],
+        },
         progress: { type: 'number' },
         result: { type: 'object', nullable: true },
       },

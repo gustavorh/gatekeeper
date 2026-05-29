@@ -7,6 +7,7 @@ import {
   ValidationPipe,
   UsePipes,
   HttpStatus,
+  NotFoundException,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -67,7 +68,7 @@ export class UserController {
     );
 
     if (!userWithRoles) {
-      throw new Error('User not found');
+      throw new NotFoundException('User not found');
     }
 
     return userWithRoles;
