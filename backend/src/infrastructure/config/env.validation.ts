@@ -26,7 +26,17 @@ export const envValidationSchema = Joi.object({
   THROTTLE_AUTH_TTL: Joi.number().default(60),
   THROTTLE_AUTH_LIMIT: Joi.number().default(5),
 
-  BULL_REDIS_URL: Joi.string().uri({ scheme: ['redis', 'rediss'] }).optional(),
+  LOG_LEVEL: Joi.string()
+    .valid('debug', 'info', 'warn', 'error')
+    .optional()
+    .default('info'),
+
+  // Only required when running db:seed; optional during normal application runtime
+  SEED_ADMIN_PASSWORD: Joi.string().optional(),
+
+  BULL_REDIS_URL: Joi.string()
+    .uri({ scheme: ['redis', 'rediss'] })
+    .optional(),
 }).custom((value: Record<string, string | undefined>, helpers) => {
   if (!value.DATABASE_URL && !value.DB_HOST) {
     return helpers.error('any.invalid', {

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Logger } from 'nestjs-pino';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
+import express from 'express';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
@@ -87,6 +88,10 @@ async function bootstrap() {
     customSiteTitle: 'Gatekeeper API Documentation',
   });
 
+  // Limit request body size to prevent payload-based DoS
+  app.use(express.json({ limit: '100kb' }));
+  app.use(express.urlencoded({ extended: true, limit: '100kb' }));
+
   const port = process.env.PORT || 3000;
   await app.listen(port);
 
@@ -95,4 +100,7 @@ async function bootstrap() {
   logger.log(`Swagger docs at /api/docs`);
 }
 
-bootstrap();
+bootstrap().catch((err: unknown) => {
+  console.error('Fatal startup error', err);
+  process.exit(1);
+});
