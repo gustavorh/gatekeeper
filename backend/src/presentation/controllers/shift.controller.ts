@@ -13,12 +13,12 @@ import { ShiftService } from '../../application/services/shift.service';
 import {
   ClockInDto,
   ClockOutDto,
-  ShiftHistoryDto,
   ShiftResponseDto,
   ShiftHistoryResponseDto,
 } from '../../application/dto/shift.dto';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
+import type { JwtPayload } from '../../application/types/jwt-payload';
 import {
   ApiTags,
   ApiOperation,
@@ -74,8 +74,8 @@ export class ShiftController {
     status: 404,
     description: 'User not found or inactive',
   })
-  async clockIn(@CurrentUser() user: any): Promise<ShiftResponseDto> {
-    return this.shiftService.clockIn(user.id) as Promise<ShiftResponseDto>;
+  async clockIn(@CurrentUser() user: JwtPayload): Promise<ShiftResponseDto> {
+    return this.shiftService.clockIn(user.id);
   }
 
   /**
@@ -112,8 +112,8 @@ export class ShiftController {
     status: 404,
     description: 'User not found or inactive, or no active shift found',
   })
-  async clockOut(@CurrentUser() user: any): Promise<ShiftResponseDto> {
-    return this.shiftService.clockOut(user.id) as Promise<ShiftResponseDto>;
+  async clockOut(@CurrentUser() user: JwtPayload): Promise<ShiftResponseDto> {
+    return this.shiftService.clockOut(user.id);
   }
 
   /**
@@ -142,9 +142,9 @@ export class ShiftController {
     description: 'User not found',
   })
   async getCurrentShift(
-    @CurrentUser() user: any,
+    @CurrentUser() user: JwtPayload,
   ): Promise<ShiftResponseDto | null> {
-    return this.shiftService.getCurrentShift(user.id) as Promise<ShiftResponseDto | null>;
+    return this.shiftService.getCurrentShift(user.id);
   }
 
   /**
@@ -208,7 +208,7 @@ export class ShiftController {
     description: 'User not found',
   })
   async getShiftHistory(
-    @CurrentUser() user: any,
+    @CurrentUser() user: JwtPayload,
     @Query('limit') limit?: number,
     @Query('offset') offset?: number,
     @Query('startDate') startDate?: string,
@@ -222,13 +222,9 @@ export class ShiftController {
         { startDate, endDate, status: status as ShiftStatus | undefined },
         limit || 10,
         offset || 0,
-      ) as Promise<ShiftHistoryResponseDto>;
+      );
     }
-    return this.shiftService.getShiftHistory(
-      user.id,
-      limit || 10,
-      offset || 0,
-    ) as Promise<ShiftHistoryResponseDto>;
+    return this.shiftService.getShiftHistory(user.id, limit || 10, offset || 0);
   }
 
   /**
@@ -311,12 +307,8 @@ export class ShiftController {
         { startDate, endDate, status: status as ShiftStatus | undefined },
         limit || 10,
         offset || 0,
-      ) as Promise<ShiftHistoryResponseDto>;
+      );
     }
-    return this.shiftService.getShiftHistory(
-      userId,
-      limit || 10,
-      offset || 0,
-    ) as Promise<ShiftHistoryResponseDto>;
+    return this.shiftService.getShiftHistory(userId, limit || 10, offset || 0);
   }
 }

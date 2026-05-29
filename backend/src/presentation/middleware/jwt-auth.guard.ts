@@ -39,8 +39,7 @@ export class JwtAuthGuard implements CanActivate {
         throw new UnauthorizedException('User not found or inactive');
       }
 
-      const organizationId =
-        payload.organizationId || 'gatekeeper-default';
+      const organizationId = payload.organizationId || 'gatekeeper-default';
       if (!organizationId) {
         throw new UnauthorizedException('No active organization in session');
       }
@@ -59,9 +58,10 @@ export class JwtAuthGuard implements CanActivate {
   private extractTokenFromHeader(request: Request): string | undefined {
     const [type, token] = request.headers.authorization?.split(' ') ?? [];
     if (type === 'Bearer' && token) return token;
-    const cookies = (
-      request as Request & { cookies?: Record<string, string> }
-    ).cookies;
-    return cookies?.[AUTH_TOKEN_COOKIE] ?? cookies?.[AUTH_TOKEN_COOKIE_FALLBACK];
+    const cookies = (request as Request & { cookies?: Record<string, string> })
+      .cookies;
+    return (
+      cookies?.[AUTH_TOKEN_COOKIE] ?? cookies?.[AUTH_TOKEN_COOKIE_FALLBACK]
+    );
   }
 }

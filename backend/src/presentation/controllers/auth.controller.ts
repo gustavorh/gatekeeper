@@ -12,9 +12,10 @@ import { AuthService } from '../../application/services/auth.service';
 import { LoginDto, RegisterDto } from '../../application/dto/auth.dto';
 import { ChangePasswordDto } from '../../application/dto/profile.dto';
 import { AuthResponse } from '../../application/dto/response.dto';
+import type { AuthResult } from '../../domain/services/auth.service.interface';
 import { CurrentUser } from '../decorators/current-user.decorator';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
-import { User } from '../../domain/entities/user.entity';
+import type { JwtPayload } from '../../application/types/jwt-payload';
 import {
   ApiTags,
   ApiOperation,
@@ -103,7 +104,7 @@ export class AuthController {
   async login(
     @Body() loginDto: LoginDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponse> {
+  ): Promise<AuthResult> {
     const auth = await this.authService.login(loginDto);
     this.setAuthCookies(res, auth.token);
     return auth;
@@ -144,7 +145,7 @@ export class AuthController {
   async register(
     @Body() registerDto: RegisterDto,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<AuthResponse> {
+  ): Promise<AuthResult> {
     const auth = await this.authService.register(registerDto);
     this.setAuthCookies(res, auth.token);
     return auth;
@@ -190,7 +191,7 @@ export class AuthController {
     description: 'User not found',
   })
   async changePassword(
-    @CurrentUser() user: User,
+    @CurrentUser() user: JwtPayload,
     @Body() changePasswordDto: ChangePasswordDto,
   ): Promise<{ success: boolean; message: string }> {
     return this.authService.changePassword(user.id, changePasswordDto);
@@ -204,9 +205,10 @@ export class AuthController {
       'Clears the auth_token and gk-auth cookies so subsequent requests are unauthenticated.',
   })
   @ApiResponse({ status: 200, description: 'Session cleared' })
-  logout(
-    @Res({ passthrough: true }) res: Response,
-  ): { success: boolean; message: string } {
+  logout(@Res({ passthrough: true }) res: Response): {
+    success: boolean;
+    message: string;
+  } {
     this.clearAuthCookies(res);
     return { success: true, message: 'Logged out' };
   }

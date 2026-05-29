@@ -5,8 +5,7 @@ beforeAll(async () => {
   // Set test environment variables
   process.env.NODE_ENV = 'test';
   process.env.JWT_SECRET = 'test-secret-key';
-  process.env.DATABASE_URL =
-    'mysql://test:test@localhost:3306/gatekeeper_test';
+  process.env.DATABASE_URL = 'mysql://test:test@localhost:3306/gatekeeper_test';
 });
 
 // Global test utilities

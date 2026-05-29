@@ -5,12 +5,12 @@ import {
   Param,
   Query,
   UseGuards,
-  Request,
-  ParseIntPipe,
   BadRequestException,
 } from '@nestjs/common';
 import { AnalyticsService } from '../../application/services/analytics.service';
 import { JwtAuthGuard } from '../middleware/jwt-auth.guard';
+import { CurrentUser } from '../decorators/current-user.decorator';
+import type { JwtPayload } from '../../application/types/jwt-payload';
 import { WorkHoursSummary } from '../../domain/entities/shift.entity';
 import {
   WorkHoursQueryDto,
@@ -27,9 +27,9 @@ export class AnalyticsController {
    */
   @Get('work-hours/current-week')
   async getCurrentWeekAnalytics(
-    @Request() req: any,
+    @CurrentUser() user: JwtPayload,
   ): Promise<WorkHoursSummary> {
-    return this.analyticsService.getCurrentWeekAnalytics(req.user.id);
+    return this.analyticsService.getCurrentWeekAnalytics(user.id);
   }
 
   /**
@@ -37,9 +37,9 @@ export class AnalyticsController {
    */
   @Get('work-hours/current-month')
   async getCurrentMonthAnalytics(
-    @Request() req: any,
+    @CurrentUser() user: JwtPayload,
   ): Promise<WorkHoursSummary> {
-    return this.analyticsService.getCurrentMonthAnalytics(req.user.id);
+    return this.analyticsService.getCurrentMonthAnalytics(user.id);
   }
 
   /**
@@ -47,7 +47,7 @@ export class AnalyticsController {
    */
   @Get('work-hours/week')
   async getWeekAnalytics(
-    @Request() req: any,
+    @CurrentUser() user: JwtPayload,
     @Query() query: WorkHoursQueryDto,
   ): Promise<WorkHoursSummary> {
     if (!query.startDate) {
@@ -59,7 +59,7 @@ export class AnalyticsController {
       throw new BadRequestException('Invalid startDate format');
     }
 
-    return this.analyticsService.getWeekAnalytics(req.user.id, date);
+    return this.analyticsService.getWeekAnalytics(user.id, date);
   }
 
   /**
@@ -67,7 +67,7 @@ export class AnalyticsController {
    */
   @Get('work-hours/month')
   async getMonthAnalytics(
-    @Request() req: any,
+    @CurrentUser() user: JwtPayload,
     @Query() query: WorkHoursQueryDto,
   ): Promise<WorkHoursSummary> {
     if (!query.startDate) {
@@ -79,23 +79,23 @@ export class AnalyticsController {
       throw new BadRequestException('Invalid startDate format');
     }
 
-    return this.analyticsService.getMonthAnalytics(req.user.id, date);
+    return this.analyticsService.getMonthAnalytics(user.id, date);
   }
 
   /**
    * Start lunch break for the authenticated user
    */
   @Post('lunch-break/start')
-  async startLunchBreak(@Request() req: any) {
-    return this.analyticsService.startLunchBreak(req.user.id);
+  async startLunchBreak(@CurrentUser() user: JwtPayload) {
+    return this.analyticsService.startLunchBreak(user.id);
   }
 
   /**
    * End lunch break for the authenticated user
    */
   @Post('lunch-break/end')
-  async endLunchBreak(@Request() req: any) {
-    return this.analyticsService.endLunchBreak(req.user.id);
+  async endLunchBreak(@CurrentUser() user: JwtPayload) {
+    return this.analyticsService.endLunchBreak(user.id);
   }
 
   /**
