@@ -8,13 +8,16 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
-import { IAuthService } from '../../domain/services/auth.service.interface';
-import { LoginDto, RegisterDto } from '../dto/auth.dto';
+import {
+  IAuthService,
+  LoginData,
+  RegisterData,
+  AuthResult,
+} from '../../domain/services/auth.service.interface';
 import { ChangePasswordDto } from '../dto/profile.dto';
 import { IUserRepository } from '../../domain/repositories/user.repository.interface';
 import { IRoleRepository } from '../../domain/repositories/role.repository.interface';
 import { User } from '../../domain/entities/user.entity';
-import { AuthResponse } from '../dto/response.dto';
 import { UserProfileService } from './user-profile.service';
 
 @Injectable()
@@ -28,15 +31,15 @@ export class AuthService implements IAuthService {
     private readonly userProfileService: UserProfileService,
   ) {}
 
-  async login(loginDto: LoginDto): Promise<AuthResponse> {
-    const user = await this.userRepository.findByRut(loginDto.rut);
+  async login(loginData: LoginData): Promise<AuthResult> {
+    const user = await this.userRepository.findByRut(loginData.rut);
 
     if (!user || !user.isActive) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
     const isPasswordValid = await this.comparePassword(
-      loginDto.password,
+      loginData.password,
       user.password,
     );
 
@@ -59,9 +62,9 @@ export class AuthService implements IAuthService {
     };
   }
 
-  async register(registerDto: RegisterDto): Promise<AuthResponse> {
+  async register(registerData: RegisterData): Promise<AuthResult> {
     const existingUserByRut = await this.userRepository.findByRut(
-      registerDto.rut,
+      registerData.rut,
     );
 
     if (existingUserByRut) {
@@ -69,17 +72,20 @@ export class AuthService implements IAuthService {
     }
 
     const existingUserByEmail = await this.userRepository.findByEmail(
-      registerDto.email,
+      registerData.email,
     );
 
     if (existingUserByEmail) {
       throw new ConflictException('User with this email already exists');
     }
 
-    const hashedPassword = await this.hashPassword(registerDto.password);
+    const hashedPassword = await this.hashPassword(registerData.password);
 
     const user = await this.userRepository.create({
-      ...registerDto,
+      rut: registerData.rut,
+      email: registerData.email,
+      firstName: registerData.firstName,
+      lastName: registerData.lastName,
       password: hashedPassword,
     });
 
@@ -106,7 +112,7 @@ export class AuthService implements IAuthService {
 
   async validateToken(token: string): Promise<Omit<User, 'password'> | null> {
     try {
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify<{ sub: string }>(token);
       const user = await this.userRepository.findById(payload.sub);
 
       if (!user || !user.isActive) {
@@ -194,6 +200,7 @@ export class AuthService implements IAuthService {
   }
 
   private excludePassword(user: User): Omit<User, 'password'> {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = user;
     return userWithoutPassword;
   }

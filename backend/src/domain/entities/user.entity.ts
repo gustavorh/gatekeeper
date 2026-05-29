@@ -1,5 +1,3 @@
-import { RegisterDto } from '../../application/dto/auth.dto';
-
 export interface User {
   id: string;
   rut: string;
@@ -12,7 +10,13 @@ export interface User {
   updatedAt: Date;
 }
 
-export type CreateUserDto = RegisterDto;
+export interface CreateUserDto {
+  rut: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
 
 export interface UpdateUserDto {
   rut?: string;
