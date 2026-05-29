@@ -5,9 +5,12 @@ import { AdminController } from '../../presentation/controllers/admin.controller
 import { AdminService } from '../services/admin.service';
 import { AdminAuthGuard } from '../../presentation/middleware/admin-auth.guard';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
+import { RolesGuard } from '../../presentation/guards/roles.guard';
 import { UserRepository } from '../../infrastructure/repositories/user.repository';
 import { RoleRepository } from '../../infrastructure/repositories/role.repository';
 import { PermissionRepository } from '../../infrastructure/repositories/permission.repository';
+import { NestCacheService } from '../../infrastructure/cache/nest-cache.service';
+import { CACHE_SERVICE } from '../interfaces/cache.service.interface';
 import { AuthModule } from './auth.module';
 import { ShiftModule } from './shift.module';
 
@@ -18,9 +21,11 @@ import { ShiftModule } from './shift.module';
     AdminService,
     JwtAuthGuard,
     AdminAuthGuard,
+    RolesGuard,
     UserRepository,
     RoleRepository,
     PermissionRepository,
+    NestCacheService,
     {
       provide: 'IUserRepository',
       useClass: UserRepository,
@@ -33,7 +38,11 @@ import { ShiftModule } from './shift.module';
       provide: 'IPermissionRepository',
       useClass: PermissionRepository,
     },
+    {
+      provide: CACHE_SERVICE,
+      useClass: NestCacheService,
+    },
   ],
-  exports: [AdminService, JwtAuthGuard, AdminAuthGuard],
+  exports: [AdminService, JwtAuthGuard, AdminAuthGuard, RolesGuard],
 })
 export class AdminModule {}

@@ -9,6 +9,9 @@ import { UserProfileService } from '../services/user-profile.service';
 import { AuthController } from '../../presentation/controllers/auth.controller';
 import { UserController } from '../../presentation/controllers/user.controller';
 import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
+import { RolesGuard } from '../../presentation/guards/roles.guard';
+import { NestCacheService } from '../../infrastructure/cache/nest-cache.service';
+import { CACHE_SERVICE } from '../interfaces/cache.service.interface';
 
 @Module({
   imports: [DatabaseModule, JwtConfigModule],
@@ -20,6 +23,8 @@ import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
     RoleRepository,
     PermissionRepository,
     JwtAuthGuard,
+    RolesGuard,
+    NestCacheService,
     {
       provide: 'IUserRepository',
       useClass: UserRepository,
@@ -32,7 +37,11 @@ import { JwtAuthGuard } from '../../presentation/middleware/jwt-auth.guard';
       provide: 'IPermissionRepository',
       useClass: PermissionRepository,
     },
+    {
+      provide: CACHE_SERVICE,
+      useClass: NestCacheService,
+    },
   ],
-  exports: [AuthService, UserProfileService, JwtAuthGuard],
+  exports: [AuthService, UserProfileService, JwtAuthGuard, RolesGuard],
 })
 export class AuthModule {}
